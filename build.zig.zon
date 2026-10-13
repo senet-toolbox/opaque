@@ -1,0 +1,16 @@
+.{
+    .name = .opaque_ui,
+    .version = "0.0.0",
+    .fingerprint = 0x18300732840bda52, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{
+        .vapor = .{
+            .path = "../vapor",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
