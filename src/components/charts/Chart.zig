@@ -2,7 +2,7 @@ const std = @import("std");
 const Vapor = @import("vapor");
 const Box = Vapor.Box;
 const Text = Vapor.Text;
-const Svg = @import("svg.zig").Svg;
+const Svg = @import("Svg.zig").Svg;
 const LinearScale = @import("scales/linear.zig").LinearScale;
 const BandScale = @import("scales/band.zig").BandScale;
 const path_util = @import("util/path.zig");
@@ -82,8 +82,8 @@ const TooltipLegend = struct {
 pub const Tooltip = struct {
     top: f32 = 0,
     left: f32 = 0,
-    binded: Vapor.Binded = .{},
-    line_binded: Vapor.Binded = .{},
+    binded: Vapor.Element = .{},
+    line_binded: Vapor.Element = .{},
     hide: bool = true,
     x_label: []const u8 = "",
     y_label: []const u8 = "",
@@ -116,7 +116,7 @@ pub const Chart = struct {
     y_axis_config: ?AxisConfig = null,
     legend_config: ?LegendConfig = null,
     current_chart_svg: ?[]const u8 = null,
-    container: Vapor.Binded = .{},
+    container: Vapor.Element = .{},
 
     rendered_elements: std.array_list.Managed(RenderedElement),
     old_rendered_elements: std.array_list.Managed(RenderedElement),
@@ -140,7 +140,7 @@ pub const Chart = struct {
 
     // Zoom/selection state
     selection: ?SelectionState = null,
-    selection_rect: Vapor.Binded = .{},
+    selection_rect: Vapor.Element = .{},
     zoom_enabled: bool = true,
 
     // Store original domains for reset
@@ -237,7 +237,7 @@ pub const Chart = struct {
         bar_radius: f64 = 0,
         // NEW: Colors for stacked segments (if not specified per-segment)
         stack_colors: ?[]const Vapor.Types.Color = null,
-        border: ?Vapor.Types.BorderGrouped = null,
+        border: ?Vapor.Types.Border = null,
         // NEW: Show shadow bar behind data bars to indicate max value
         show_shadow: bool = false,
         shadow_color: ?Vapor.Types.Color = null, // Default: semi-transparent gray
@@ -1559,7 +1559,7 @@ pub const Chart = struct {
             // tooltip.binded.mutateStyleString("display", "block");
             // tooltip.line_binded.mutateStyleString("display", "block");
             tooltip.binded.mutateAttribute(.{ .flex_type = .flex });
-            tooltip.line_binded.mutateAttribute(.{ .flex_type = .flex });
+            if (self.config.show_line) tooltip.line_binded.mutateAttribute(.{ .flex_type = .flex });
             tooltip.hide = false;
 
             if (self.findNearestX(@floatCast(x), y)) |result| {
@@ -1639,7 +1639,7 @@ pub const Chart = struct {
                 }
 
                 _ = tooltip.binded.translate3d(.{ .x = tooltip.left, .y = tooltip.top });
-                _ = tooltip.line_binded.translate3d(.{ .x = result.points[0].screen_x - 0.5 });
+                if (self.config.show_line) _ = tooltip.line_binded.translate3d(.{ .x = result.points[0].screen_x - 0.5 });
 
                 self.old_x = result.points[0].screen_x;
             }
@@ -1650,7 +1650,7 @@ pub const Chart = struct {
             // tooltip.binded.mutateStyleString("display", "none");
             // tooltip.line_binded.mutateStyleString("display", "none");
             tooltip.binded.mutateAttribute(.{ .flex_type = .hidden });
-            tooltip.line_binded.mutateAttribute(.{ .flex_type = .hidden });
+            if (self.config.show_line) tooltip.line_binded.mutateAttribute(.{ .flex_type = .hidden });
 
             tooltip.hide = true;
         }
@@ -1938,7 +1938,8 @@ pub const Chart = struct {
 
         if (self.tooltip) |*tooltip| {
             tooltip.binded.mutateAttribute(.{ .flex_type = .hidden });
-            tooltip.line_binded.mutateAttribute(.{ .flex_type = .hidden });
+            // The line is only on the page when the chart shows one.
+            if (self.config.show_line) tooltip.line_binded.mutateAttribute(.{ .flex_type = .hidden });
         }
         Vapor.cycle();
     }
@@ -1986,13 +1987,13 @@ pub const Chart = struct {
                         })
                         .pos(.absolute)
                         .width(.px(140))
-                        .padding(.tblr(2, 2, 4, 4))
+                        .padding(.xy(4, 2))
                         .ml(if (self.config.show_line) 16 else 0)
                         .layout(.top_left)
                         .direction(.column)
                         .background(.palette(.background))
                         .border(.round(.transparent, .all(4)))
-                        .shadow(.glow(4, .transparentizeHex(.hex("#616161"), 0.1)))
+                        .shadow(.glow(4, .transparentize(.hex("#616161"), 0.1)))
                         .zIndex(1000)
                         .children({
                         Text(tooltip.x_label)

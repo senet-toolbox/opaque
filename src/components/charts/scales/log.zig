@@ -20,7 +20,7 @@ pub const LogScale = struct {
         const log_min = @log10(self.domain_min);
         const log_max = @log10(self.domain_max);
         const log_val = @log10(@max(value, 1e-10));
-        
+
         const normalized = (log_val - log_min) / (log_max - log_min);
         return self.range_min + normalized * (self.range_max - self.range_min);
     }
@@ -29,10 +29,10 @@ pub const LogScale = struct {
         _ = count;
         // Log scales use powers: 1, 10, 100, 1000...
         var result = std.array_list.Managed(f64).init(allocator);
-        
+
         const min_exp = @floor(@log10(self.domain_min));
         const max_exp = @ceil(@log10(self.domain_max));
-        
+
         var exp = min_exp;
         while (exp <= max_exp) : (exp += 1) {
             const val = std.math.pow(f64, 10, exp);
@@ -40,7 +40,7 @@ pub const LogScale = struct {
                 try result.append(val);
             }
         }
-        
+
         return result.toOwnedSlice();
     }
 
@@ -52,5 +52,5 @@ pub const LogScale = struct {
         // const normalized = (log_val - self.range_min) / (self.range_max - self.range_min);
         unreachable;
         // return ;
-    }   
+    }
 };

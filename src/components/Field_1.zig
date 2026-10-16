@@ -775,7 +775,7 @@ fn renderLabel(
     z_index: f32,
     text_color: Vapor.Types.Color,
     background: Vapor.Types.Color,
-) Vapor.BuilderClose(.pure) {
+) Vapor.Builder(.pure) {
     return Label(label)
         .background(background)
         .pos(.{ .left = .px(label_left), .type = .absolute, .top = if (trans == -50) .percent(50) else .percent(0) })
@@ -832,7 +832,7 @@ pub fn render(field: *TextField) void {
     const label_left: f32 = if (is_focused or field.trans_label) 12 + 12 else 12;
 
     const z_index: f32 = if (is_focused) 10 else 0;
-    const text_color: Vapor.Types.Color = if (is_focused) field.tint_color else .transparentizeHex(.palette(.text_color), 0.5);
+    const text_color: Vapor.Types.Color = if (is_focused) field.tint_color else .transparentize(.palette(.text_color), 0.5);
 
     field.is_focused = is_focused;
     field.scale = scale;
@@ -844,10 +844,10 @@ pub fn render(field: *TextField) void {
         .pos(.relative)
         .border(.round(if (is_focused) .palette(.tint) else .palette(.border_color_light), .all(12)))
         .background(background)
-        .shadow(.glow(3, if (is_focused) .transparentizeHex(.palette(.tint), 0.2) else .transparent))
+        .shadow(.glow(3, if (is_focused) .transparentize(.palette(.tint), 0.2) else .transparent))
         .children({
         const field_id = Vapor.fmtln("{s}_{s}", .{ @tagName(field_type), stable_id });
-        var label_component: ?Vapor.BuilderClose(.pure) = null;
+        var label_component: ?Vapor.Builder(.pure) = null;
         if (field.label) |label| {
             label_component = renderLabel(label, label_left, trans, scale, z_index, text_color, background);
             field.label_id = label_component.?.getUUID();
@@ -912,7 +912,7 @@ pub fn render(field: *TextField) void {
                 text_field
                     .pos(.absolute)
                     .onEvent(.focus, handleFocus, .{ stable_id, field })
-                    .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                    .onEvent(.blur, handleBlur, .{ stable_id, field })
                     .width(.percent(100))
                     .onEvent(.input, passwordCallback, .{field})
                     .border(.none)
@@ -924,7 +924,7 @@ pub fn render(field: *TextField) void {
                 text_field
                     .pos(.absolute)
                     .onEvent(.focus, handleFocus, .{ stable_id, field })
-                    .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                    .onEvent(.blur, handleBlur, .{ stable_id, field })
                     .border(.none)
                     .width(.percent(100))
                     .onEvent(.input, numberCallback, .{field})
@@ -938,7 +938,7 @@ pub fn render(field: *TextField) void {
                 text_field
                     .pos(.absolute)
                     .onEvent(.focus, handleFocus, .{ stable_id, field })
-                    .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                    .onEvent(.blur, handleBlur, .{ stable_id, field })
                     .border(.none)
                     .width(.percent(100))
                     .onEvent(.input, int64Callback, .{field})
@@ -952,7 +952,7 @@ pub fn render(field: *TextField) void {
                 text_field
                     .pos(.absolute)
                     .onEvent(.focus, handleFocus, .{ stable_id, field })
-                    .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                    .onEvent(.blur, handleBlur, .{ stable_id, field })
                     .border(.none)
                     .width(.percent(100))
                     .onEvent(.input, floatCallback, .{field})
@@ -995,7 +995,7 @@ pub fn render(field: *TextField) void {
                 text_field
                     .pos(.absolute)
                     .onEvent(.focus, handleFocus, .{ stable_id, field })
-                    .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                    .onEvent(.blur, handleBlur, .{ stable_id, field })
                     .onEvent(.input, dateCallback, .{ field, date_config.format_str })
                     .border(.none)
                     .width(.percent(100))
@@ -1138,7 +1138,7 @@ pub fn Component(field: *TextField, component: ?*const fn (*TextField) Vapor.Bui
     const label_left: f32 = if (is_focused or field.trans_label) 12 + 12 else 12;
 
     const z_index: f32 = if (is_focused) 10 else 0;
-    const text_color: Vapor.Types.Color = if (is_focused) field.tint_color else .transparentizeHex(.palette(.text_color), 0.5);
+    const text_color: Vapor.Types.Color = if (is_focused) field.tint_color else .transparentize(.palette(.text_color), 0.5);
 
     field.is_focused = is_focused;
 
@@ -1158,12 +1158,12 @@ pub fn Component(field: *TextField, component: ?*const fn (*TextField) Vapor.Bui
                 .pos(.relative)
                 .border(.round(if (is_focused) .palette(.tint) else .palette(.border_color_light), .all(12)))
                 .background(background)
-                .shadow(.glow(3, if (is_focused) .transparentizeHex(.palette(.tint), 0.2) else .transparent));
+                .shadow(.glow(3, if (is_focused) .transparentize(.palette(.tint), 0.2) else .transparent));
         }
         comp
             .children({
             const field_id = Vapor.fmtln("{s}_{s}", .{ @tagName(field_type), stable_id });
-            var label_component: ?Vapor.BuilderClose(.pure) = null;
+            var label_component: ?Vapor.Builder(.pure) = null;
             if (field.label) |label| {
                 label_component = renderLabel(label, label_left, trans, scale, z_index, text_color, background);
                 label_component.?.fieldName(field_id).end();
@@ -1227,7 +1227,7 @@ pub fn Component(field: *TextField, component: ?*const fn (*TextField) Vapor.Bui
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, field })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                        .onEvent(.blur, handleBlur, .{ stable_id, field })
                         .width(.percent(100))
                         .onEvent(.input, passwordCallback, .{field})
                         .border(.none)
@@ -1239,7 +1239,7 @@ pub fn Component(field: *TextField, component: ?*const fn (*TextField) Vapor.Bui
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, field })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                        .onEvent(.blur, handleBlur, .{ stable_id, field })
                         .border(.none)
                         .width(.percent(100))
                         .onEvent(.input, numberCallback, .{field})
@@ -1253,7 +1253,7 @@ pub fn Component(field: *TextField, component: ?*const fn (*TextField) Vapor.Bui
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, field })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                        .onEvent(.blur, handleBlur, .{ stable_id, field })
                         .border(.none)
                         .width(.percent(100))
                         .onEvent(.input, int64Callback, .{field})
@@ -1267,7 +1267,7 @@ pub fn Component(field: *TextField, component: ?*const fn (*TextField) Vapor.Bui
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, field })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                        .onEvent(.blur, handleBlur, .{ stable_id, field })
                         .border(.none)
                         .width(.percent(100))
                         .onEvent(.input, floatCallback, .{field})
@@ -1310,7 +1310,7 @@ pub fn Component(field: *TextField, component: ?*const fn (*TextField) Vapor.Bui
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, field })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, field })
+                        .onEvent(.blur, handleBlur, .{ stable_id, field })
                         .onEvent(.input, dateCallback, .{ field, date_config.format_str })
                         .border(.none)
                         .width(.percent(100))

@@ -211,7 +211,16 @@ pub const ProgressCircle = struct {
         const offset: f64 = circumference * (1.0 - self.progress);
         self.platform.browser.setAttribute(id_suffix, "stroke-dasharray", Vapor.fmtln("{d:.2}", .{circumference}));
         self.platform.browser.setAttribute(id_suffix, "stroke-dashoffset", Vapor.fmtln("{d:.2}", .{if (self.config.clockwise) offset else -offset}));
-        Vapor.lib.mutateById(text_suffix, "innerHTML", Vapor.fmtln("{d:.0}%", .{self.progress * 100}));
+        // The label is only drawn when it is shown.
+        if (self.config.show_label and self.config.label_format != .none) {
+            Vapor.lib.mutateById(text_suffix, "innerHTML", Vapor.fmtln("{d:.0}%", .{self.progress * 100}));
+        }
+        // No render follows, so the value screen readers see moves here too.
+        self.platform.browser.setAttribute(self.elementId(), "aria-valuenow", Vapor.fmtln("{d:.0}", .{self.progress * 100}));
+    }
+
+    fn elementId(self: *const ProgressCircle) []const u8 {
+        return Vapor.fmtln("progress-{x}", .{@intFromPtr(self)});
     }
 
     pub fn rebuild(self: *ProgressCircle) void {
@@ -416,6 +425,8 @@ pub const ProgressCircle = struct {
     /// Render the progress circle
     pub fn render(self: *ProgressCircle) void {
         Box()
+            .id(self.elementId())
+            .a11y(Vapor.Accessibility.progressBar(@floatCast(self.progress * 100), 100).setLabel("Progress"))
             .width(.px(@floatFromInt(self.config.size)))
             .height(.px(@floatFromInt(self.config.size)))
             .onMount(rebuild, .{self})

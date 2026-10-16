@@ -1,93 +1,77 @@
+//! Collapsible sections: each item's trigger opens and closes its panel.
+//!
+//!   var items = [_]Accordion.AccordionItem{
+//!       .{ .title = "Shipping", .description = "...", .trigger = myTrigger, .content = myContent },
+//!   };
+//!   var accordion = Accordion.init(&items);
+//!   accordion.render();
+//!
+//! Panels take their content's height, whatever it is: the open/close
+//! animation runs on a grid row, not on a measured pixel height. A closed
+//! panel is hidden from the tab order and from screen readers.
+
 const std = @import("std");
 const Vapor = @import("vapor");
-const Text = Vapor.Text;
 const Box = Vapor.Box;
-const ButtonCtx = Vapor.CtxButton;
 const Button = Vapor.Button;
 
 const Accordion = @This();
 items: []AccordionItem,
 
-var border_color: Vapor.Types.Color = .hex("#e4e4e4");
+const duration_ms = 150;
 
 pub const AccordionItem = struct {
     title: []const u8,
     description: []const u8,
     is_open: bool = false,
-    min_height: f32 = 42,
-    max_height: f32 = 252,
-    height: f32 = 42,
-    total_height: Vapor.Types.Sizing = .px(42),
-    binded: Vapor.Binded = .{},
-    calculated_height: f32 = 0,
-
     trigger: ?*const fn (*AccordionItem) void = null,
     content: ?*const fn (*AccordionItem) void = null,
 
-    fn toggle(accordon_item: *AccordionItem) void {
-        if (accordon_item.is_open) {
-            accordon_item.is_open = false;
-            accordon_item.height = accordon_item.min_height;
-            accordon_item.total_height = .px(42);
-        } else {
-            accordon_item.is_open = true;
-            accordon_item.height = accordon_item.max_height;
-            accordon_item.total_height = .px(accordon_item.calculated_height);
-        }
+    fn toggle(item: *AccordionItem) void {
+        item.is_open = !item.is_open;
     }
 
-    fn mount(accordon_item: *AccordionItem) void {
-        const full_height = accordon_item.binded.getAttributeNumber("scrollHeight") + 52;
-        accordon_item.calculated_height = @floatFromInt(full_height);
-    }
-
-    pub fn render(accordon_item: *AccordionItem) void {
+    pub fn render(item: *AccordionItem) void {
+        // Two grid rows: the trigger at its own height, and the panel,
+        // which animates between 0fr and 1fr, i.e. 0 and its content height.
         Box()
-            .onMount(mount, .{accordon_item})
             .width(.percent(100))
-            .height(accordon_item.total_height)
-            .transition(.{
-                .properties = &.{.height},
-                .duration = 150,
-                .timing = .easeInOut,
+            .inlineStyle("display: grid; grid-template-rows: auto {s}; transition: grid-template-rows {d}ms ease-in-out;", .{
+                if (item.is_open) "1fr" else "0fr",
+                duration_ms,
             })
-            // Position: Top Right, fixed/absolute
-            .background(.transparent)
-
-            // Layout: Row (Icon -> Content -> Close)
-            .layout(.top_left) // Vertically center items
-            .direction(.column)
             .children({
-            Box()
-                .height(.px(accordon_item.min_height))
+            Button(toggle, .{item})
+                .a11y(Vapor.Accessibility.init().setExpanded(item.is_open))
+                .width(.percent(100))
+                .padding(.vertical(8))
+                .background(.transparent)
+                .cursor(.pointer)
                 .layout(.x_between_center)
-                .width(.percent(100))
+                .spacing(12)
                 .children({
-                ButtonCtx(toggle, .{accordon_item})
-                    .height(.percent(100))
-                    .width(.percent(100))
-                    .background(.transparent)
-                    .cursor(.pointer)
-                    .layout(.x_between_center)
-                    .children({
-                    if (accordon_item.trigger) |trigger| {
-                        trigger(accordon_item);
-                    }
-                    Vapor.Icon(if (accordon_item.is_open) .chevron_down else .chevron_up)
-                        .font(12, 700, .palette(.text_color))
-                        .end();
-                });
+                if (item.trigger) |trigger| trigger(item);
+                Vapor.Icon(if (item.is_open) .chevron_up else .chevron_down)
+                    .font(12, 700, .palette(.text_color))
+                    .end();
             });
+            // The panel. Once closed it turns invisible, after the animation,
+            // which takes its buttons out of the tab order.
             Box()
-                .height(.grow)
                 .width(.percent(100))
-                .padding(.horizontal(12))
-                .ref(&accordon_item.binded)
-                .scroll(.{ .x = .hidden, .y = .hidden })
+                .direction(.column)
+                .inlineStyle("min-height: 0; overflow: hidden; visibility: {s}; transition: visibility 0s linear {d}ms;", .{
+                    if (item.is_open) "visible" else "hidden",
+                    if (item.is_open) @as(u32, 0) else duration_ms,
+                })
                 .children({
-                if (accordon_item.content) |content| {
-                    content(accordon_item);
-                }
+                Box()
+                    .width(.percent(100))
+                    .direction(.column)
+                    .padding(.{ .left = 12, .right = 12, .bottom = 12 })
+                    .children({
+                    if (item.content) |content| content(item);
+                });
             });
         });
     }
@@ -101,6 +85,7 @@ pub fn init(items: []AccordionItem) Accordion {
 
 pub fn render(accordion: *Accordion) void {
     Box()
+        .width(.percent(100))
         .direction(.column)
         .spacing(8)
         .children({

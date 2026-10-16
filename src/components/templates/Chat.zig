@@ -26,7 +26,7 @@ const Icon = Vapor.Icon;
 const TextFmt = Vapor.TextFmt;
 const TextField = Vapor.TextField;
 const Animation = Vapor.Animation;
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 const DateTime = Vapor.DateTime;
 
 // =============================================================================
@@ -37,7 +37,7 @@ const SelectStruct = @import("../../components/Select.zig");
 const ToastStruct = @import("../../components/Toast.zig");
 const SheetStruct = @import("../../components/Sheet.zig");
 const FieldStruct = @import("../../components/Field.zig");
-const TooltipStruct = @import("../../components/Tooltip.zig");
+const TooltipStruct = @import("../../components/ToolTip.zig");
 const SwitchStruct = @import("../../components/Switch.zig");
 const GroupStruct = @import("../../components/Group.zig");
 const Button = @import("../../components/Button.zig").Button;
@@ -327,7 +327,7 @@ var filter_pinned: bool = false;
 var selected_user: ?*const User = null;
 
 // --- UI References ---
-var scroll_container: Vapor.Binded = .{};
+var scroll_container: Vapor.Element = .{};
 
 // --- Typing Indicator State ---
 var typing_timer: ?u64 = null;
@@ -449,7 +449,7 @@ fn initSampleData() void {
         .{ .id = 5, .conversation_id = 1, .sender_id = 2, .content = "Perfect! No rush though", .message_type = .text, .timestamp = base_time + 360, .is_read = true, .reactions = Vapor.array(Reaction, .persist), .state = .delivered },
         .{ .id = 6, .conversation_id = 1, .sender_id = 1, .content = "I'll have it ready by end of day", .message_type = .text, .timestamp = base_time + 600, .is_read = true, .reactions = Vapor.array(Reaction, .persist), .state = .read },
         .{ .id = 7, .conversation_id = 1, .sender_id = 2, .content = "Sounds good! Let me know when you're free", .message_type = .text, .timestamp = base_time + 720, .is_read = false, .reactions = Vapor.array(Reaction, .persist), .state = .delivered },
-    }) catch |err| Vapor.printErr("Failed to init messages: {any}", .{err});
+    }) catch |err| Vapor.print(.err, "Failed to init messages: {any}", .{err});
 
     selected_conversation = &sample_conversations[0];
 }
@@ -599,7 +599,7 @@ fn sendMessage() void {
 
     // Clear input and scroll to bottom
     message_input = "";
-    Vapor.onEnd(autoScroll);
+    Vapor.onLayout(autoScroll, .{});
 }
 
 /// Send a WebSocket message over the wire
@@ -756,7 +756,7 @@ fn handleIncomingMessage(ws_msg: WebSocketMessage) void {
     // Notify if not in this conversation
     if (selected_conversation) |conv| {
         if (conv.id == conv_id) {
-            Vapor.onEnd(autoScroll);
+            Vapor.onLayout(autoScroll, .{});
         } else {
             incrementUnreadCount(conv_id);
             Toast.info(.{ .title = "New Message", .description = ws_msg.content });
@@ -841,7 +841,7 @@ fn appendIncomingMessage(ws_msg: WebSocketMessage, sender_id: usize) void {
     };
 
     Toast.success(.{ .title = "New Message", .description = "" });
-    Vapor.onEnd(autoScroll);
+    Vapor.onLayout(autoScroll, .{});
 }
 
 // =============================================================================
@@ -896,7 +896,7 @@ fn selectConversation(conv: *Conversation) void {
     markConversationAsRead(conv.id);
 
     // Scroll to bottom
-    Vapor.onEnd(autoScroll);
+    Vapor.onLayout(autoScroll, .{});
 }
 
 /// Load conversation history from server (placeholder for API integration)
@@ -1220,7 +1220,7 @@ fn renderSidebar() void {
             .height(.grow)
             .padding(.all(16))
             .spacing(16)
-            .scroll(.scroll_y())
+            .scroll(.scrollY())
             .children({
             for (conversations.items) |*conv| {
                 if (!matchesConversationFilter(conv)) continue;
@@ -1291,12 +1291,12 @@ fn renderConversationItem(conv: *Conversation) void {
     const is_selected = if (selected_conversation) |sel| sel.id == conv.id else false;
 
     const shadow = if (is_selected) Vapor.Types.NewShadow.init()
-        .drop(4, 4, 4, .transparentizeHex(.black, 0.1)) else null;
+        .drop(4, 4, 4, .transparentize(.black, 0.1)) else null;
     ButtonCtx(selectConversation, .{conv})
         .width(.percent(100))
         .padding(.xy(12, 4))
         .border(.round(.transparent, .all(20)))
-        .newShadow(shadow)
+        .shadow(shadow)
         .background(if (is_selected) .palette(.highlight_color) else .transparent)
         .layout(.left_center)
         .spacing(8)
@@ -1434,7 +1434,7 @@ fn renderChatArea() void {
                 .height(.grow)
                 .padding(.all(24))
                 .spacing(12)
-                .scroll(.scroll_y())
+                .scroll(.scrollY())
                 .children({
                 for (msg_list.items) |*msg| {
                     renderMessage(msg);
@@ -1513,7 +1513,7 @@ fn renderChatHeader(conv: *const Conversation) void {
             .spacing(8)
             .children({
             Button(togglePinConversation, .{@constCast(conv)})
-                .background(if (conv.is_pinned) .transparentizeHex(.palette(.tint), 0.8) else .palette(.text_color))
+                .background(if (conv.is_pinned) .transparentize(.palette(.tint), 0.8) else .palette(.text_color))
                 .width(.px(36))
                 .height(.px(36))
                 .layout(.center)
@@ -1579,7 +1579,7 @@ fn renderEmptyState() void {
             Button(openNewChatModal, .{})
                 .padding(.xy(20, 12))
                 .background(.palette(.tint))
-                .margin(.t(8))
+                .margin(.{ .top = 8 })
                 .children({
                 Icon(.plus)
                     .font(16, 600, .palette(.background))
@@ -1669,7 +1669,7 @@ fn renderMessage(msg: *Message) void {
                     for (msg.reactions.items) |reaction| {
                         Box()
                             .padding(.xy(6, 3))
-                            .background(if (reaction.user_reacted) .transparentizeHex(.palette(.tint), 0.2) else .palette(.highlight_color))
+                            .background(if (reaction.user_reacted) .transparentize(.palette(.tint), 0.2) else .palette(.highlight_color))
                             .border(.round(.transparent, .all(12)))
                             .layout(.center)
                             .spacing(4)
@@ -1699,9 +1699,9 @@ fn TriggerContent(msg: *Message) void {
         .background(if (is_own_message) .palette(.tint) else Theme.message_received)
         .border(.round(.transparent, .all(16)))
         .pos(.relative)
-        .newShadow(Vapor.Types.NewShadow.init()
-            .inset(0, -2, .transparentizeHex(.black, 0.2))
-            .drop(0, 1, 3, .transparentizeHex(.black, 0.1)))
+        .shadow(Vapor.Types.NewShadow.init()
+            .inset(0, -2, .transparentize(.black, 0.2))
+            .drop(0, 1, 3, .transparentize(.black, 0.1)))
         .children({
         Text(msg.content)
             .font(14, 400, if (is_own_message) .palette(.background) else .white)
@@ -2062,7 +2062,7 @@ fn renderNewChatModal(_: *Alert) void {
             .width(.percent(100))
             .height(.px(300))
             .spacing(8)
-            .scroll(.scroll_y())
+            .scroll(.scrollY())
             .children({
             for (users.items[1..]) |*user| {
                 renderUserOption(user);
@@ -2156,12 +2156,12 @@ pub fn render() void {
     Box()
         .width(.percent(100))
         .height(.percent(100))
-        .margin(.b(128))
+        .margin(.{ .bottom = 128 })
         .background(Theme.bg_base)
         .layout(.top_left)
         .border(.round(.transparent, .all(24)))
-        .newShadow(Vapor.Types.NewShadow.init()
-            .drop(8, 8, 6, .transparentizeHex(.black, 0.1)))
+        .shadow(Vapor.Types.NewShadow.init()
+            .drop(8, 8, 6, .transparentize(.black, 0.1)))
         .layer(.line(2, 4, .diagonal_up, .palette(.grid_color)))
         .children({
         // Sidebar with conversations list

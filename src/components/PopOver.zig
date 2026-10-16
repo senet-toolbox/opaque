@@ -11,7 +11,7 @@ pub var svg_color: Vapor.Types.Color = .black;
 pub var border_color: Vapor.Types.Color = .hex("#e4e4e4");
 var popovers: std.AutoHashMap(usize, *PopOver) = undefined;
 pub var alternate_text_color: Vapor.Types.Color = .white;
-pub var border: Vapor.Types.BorderGrouped = .round(.transparent, .all(6));
+pub var border: Vapor.Types.Border = .round(.transparent, .all(6));
 
 pub const animateEnter = Vapor.Animation.init("opaque-popover-enter")
     .prop(.opacity, 0, 1)
@@ -96,14 +96,14 @@ fn getTransformOrigin(position: Vapor.Types.AnchorPlacement) Vapor.Types.Transfo
 
 fn getMargin(position: Vapor.Types.AnchorPlacement) Vapor.Types.Margin {
     return switch (position) {
-        .top => .b(2),
-        .bottom => .t(2),
-        .left => .r(2),
-        .right => .l(2),
-        .bottom_left => .t(2),
-        .bottom_right => .t(2),
-        .top_left => .b(2),
-        .top_right => .b(2),
+        .top => .{ .bottom = 2 },
+        .bottom => .{ .top = 2 },
+        .left => .{ .right = 2 },
+        .right => .{ .left = 2 },
+        .bottom_left => .{ .top = 2 },
+        .bottom_right => .{ .top = 2 },
+        .top_left => .{ .bottom = 2 },
+        .top_right => .{ .bottom = 2 },
         else => unreachable,
     };
 }
@@ -125,7 +125,7 @@ const PopOverOptions = struct {
     container: Vapor.Builder(.pure),
     background: Vapor.Types.Color = .black,
     stroke_color: Vapor.Types.Color = .black,
-    border: Vapor.Types.BorderGrouped = .round(.transparent, .all(6)),
+    border: Vapor.Types.Border = .round(.transparent, .all(6)),
     position: Vapor.Types.AnchorPlacement = .top,
     close_on_click_outside: bool = true,
     on_trigger: ?*const fn () void = null,
@@ -173,7 +173,7 @@ pub const Options = struct {
     trigger_ctx: ?*const fn (ctx: ?*anyopaque) void = null,
     background: Vapor.Types.Color = .black,
     stroke_color: Vapor.Types.Color = .black,
-    border: Vapor.Types.BorderGrouped = .round(.transparent, .all(6)),
+    border: Vapor.Types.Border = .round(.transparent, .all(6)),
     position: Vapor.Types.AnchorPlacement = .top,
     close_on_click_outside: bool = true,
     on_trigger: ?*const fn () void = null,
@@ -249,7 +249,7 @@ pub fn Trigger(popover: *PopOver, trigger_fn: anytype, args: anytype) *PopOver {
     const container = popover.options.container;
     const anchor_name = popover.options.anchor_name;
     container
-        .onEventCtx(.click, onToggle, .{popover})
+        .onEvent(.click, onToggle, .{popover})
         .anchorSource(anchor_name)
         .children({
         @call(.auto, trigger_fn, args);
@@ -265,57 +265,57 @@ pub fn Component(popover: *PopOver, component: anytype, args: anytype) *PopOver 
     // const corner_svg = getCornerSvg(position);
 
     Anchor(anchor_name)
-        .anchorPlacement(position)
+        .placement(position)
         .zIndex(1000)
         .onDestroy(destroy, .{popover})
         .children({
-            if (popover.options.show) {
-                // Click-outside overlay to close popover
-                if (popover.options.close_on_click_outside) {
-                    Box()
-                        .id(Vapor.fmtln("popover-background-{d}", .{popover.options.stable_id}))
-                        .background(.transparent)
-                        .size(.full)
-                        .pos(.full(.fixed))
-                        .zIndex(999)
-                        .children({
-                        Button(onClickOutside, .{popover})
-                            .ariaLabel("Close Popover Dropdown")
-                            .size(.full)
-                            .pos(.tl(.px(0), .px(0), .fixed))
-                            .end();
-                    });
-                }
-
+        if (popover.options.show) {
+            // Click-outside overlay to close popover
+            if (popover.options.close_on_click_outside) {
                 Box()
-                    .width(.auto)
-                    .animationEnter("opaque-popover-enter")
-                    .animationExit("opaque-popover-exit")
-                    .border(.round(.transparent, .all(6)))
-                    .zIndex(1000)
+                    .id(Vapor.fmtln("popover-background-{d}", .{popover.options.stable_id}))
+                    .background(.transparent)
+                    .size(.full)
+                    .pos(.full(.fixed))
+                    .zIndex(999)
+                    .children({
+                    Button(onClickOutside, .{popover})
+                        .ariaLabel("Close Popover Dropdown")
+                        .size(.full)
+                        .pos(.tl(.px(0), .px(0), .fixed))
+                        .end();
+                });
+            }
+
+            Box()
+                .width(.auto)
+                .animationEnter("opaque-popover-enter")
+                .animationExit("opaque-popover-exit")
+                .border(.round(.transparent, .all(6)))
+                .zIndex(1000)
+                .layout(.center)
+                .direction(.column)
+                .pos(.relative)
+                .margin(margin)
+                .children({
+                Box()
+                    .width(.fit)
+                    // .background(popover.options.background)
+                    // .border(popover.options.border)
                     .layout(.center)
                     .direction(.column)
-                    .pos(.relative)
-                    .margin(margin)
+                    .width(.auto)
                     .children({
-                    Box()
-                        .width(.fit)
-                        // .background(popover.options.background)
-                        // .border(popover.options.border)
-                        .layout(.center)
-                        .direction(.column)
-                        .width(.auto)
-                        .children({
-                        @call(.auto, component, args);
-                    });
-                    // Vapor.Svg(.{ .svg = corner_svg })
-                    //     .fill(popover.options.background.color.?)
-                    //     .stroke(popover.options.stroke_color)
-                    //     .end();
+                    @call(.auto, component, args);
                 });
-            } else {
-                Vapor.Null();
-            }
+                // Vapor.Svg(.{ .svg = corner_svg })
+                //     .fill(popover.options.background.color.?)
+                //     .stroke(popover.options.stroke_color)
+                //     .end();
+            });
+        } else {
+            Vapor.Null();
+        }
     });
     return popover;
 }
@@ -328,58 +328,58 @@ pub fn end(popover: *PopOver) void {
     // const corner_svg = getCornerSvg(position);
 
     Anchor(anchor_name)
-        .anchorPlacement(position)
+        .placement(position)
         .zIndex(1000)
         .onDestroy(destroy, .{popover})
         .children({
-            if (popover.options.show) {
-                // Click-outside overlay to close popover
-                if (popover.options.close_on_click_outside) {
-                    Box()
-                        .id(Vapor.fmtln("popover-background-{d}", .{popover.options.stable_id}))
-                        .background(.transparent)
-                        .size(.full)
-                        .pos(.full(.fixed))
-                        .zIndex(999)
-                        .children({
-                        Button(onClickOutside, .{popover})
-                            .ariaLabel("Close Popover Dropdown")
-                            .size(.full)
-                            .pos(.tl(.px(0), .px(0), .fixed))
-                            .end();
-                    });
-                }
-
+        if (popover.options.show) {
+            // Click-outside overlay to close popover
+            if (popover.options.close_on_click_outside) {
                 Box()
-                    .width(.auto)
-                    .animationEnter("opaque-popover-enter")
-                    .animationExit("opaque-popover-exit")
+                    .id(Vapor.fmtln("popover-background-{d}", .{popover.options.stable_id}))
+                    .background(.transparent)
+                    .size(.full)
+                    .pos(.full(.fixed))
+                    .zIndex(999)
+                    .children({
+                    Button(onClickOutside, .{popover})
+                        .ariaLabel("Close Popover Dropdown")
+                        .size(.full)
+                        .pos(.tl(.px(0), .px(0), .fixed))
+                        .end();
+                });
+            }
+
+            Box()
+                .width(.auto)
+                .animationEnter("opaque-popover-enter")
+                .animationExit("opaque-popover-exit")
+                .border(.round(.transparent, .all(6)))
+                .zIndex(1000)
+                .layout(.center)
+                .direction(.column)
+                .pos(.relative)
+                .margin(margin)
+                .children({
+                Box()
+                    .background(popover.options.background)
+                    .padding(.xy(12, 6))
                     .border(.round(.transparent, .all(6)))
-                    .zIndex(1000)
                     .layout(.center)
                     .direction(.column)
-                    .pos(.relative)
-                    .margin(margin)
+                    .width(.auto)
                     .children({
-                    Box()
-                        .background(popover.options.background)
-                        .padding(.tblr(6, 6, 12, 12))
-                        .border(.round(.transparent, .all(6)))
-                        .layout(.center)
-                        .direction(.column)
-                        .width(.auto)
-                        .children({
-                        Text(popover.options.content)
-                            .font(14, 300, alternate_text_color).end();
-                    });
-                    // Vapor.Svg(.{ .svg = corner_svg })
-                    //     .fill(popover.options.background.color.?)
-                    //     .stroke(popover.options.stroke_color)
-                    //     .end();
+                    Text(popover.options.content)
+                        .font(14, 300, alternate_text_color).end();
                 });
-            } else {
-                Vapor.Null();
-            }
+                // Vapor.Svg(.{ .svg = corner_svg })
+                //     .fill(popover.options.background.color.?)
+                //     .stroke(popover.options.stroke_color)
+                //     .end();
+            });
+        } else {
+            Vapor.Null();
+        }
     });
 }
 
@@ -415,7 +415,7 @@ pub fn simpleWithPosition(title: []const u8, content: []const u8, position: Vapo
     // const corner_svg = getCornerSvg(position);
 
     trigger_box
-        .onEventCtx(.click, onToggle, .{popover})
+        .onEvent(.click, onToggle, .{popover})
         .anchorSource(anchor_name)
         .children({
         if (popover.options.trigger) |trigger_fn| {
@@ -424,7 +424,7 @@ pub fn simpleWithPosition(title: []const u8, content: []const u8, position: Vapo
             @call(.auto, trigger_fn, .{popover.options.ctx});
         } else {
             Box()
-                .padding(.tblr(4, 4, 12, 12))
+                .padding(.xy(12, 4))
                 .background(background)
                 .duration(100)
                 .hover(.{
@@ -437,63 +437,62 @@ pub fn simpleWithPosition(title: []const u8, content: []const u8, position: Vapo
         }
     });
     Anchor(anchor_name)
-        .anchorPlacement(position)
-        .placement(.anchor_center)
+        .placement(position)
         .onDestroy(destroy, .{popover})
         .zIndex(1000)
         .children({
-            if (popover.options.show) {
-                // Click-outside overlay to close popover
-                if (popover.options.close_on_click_outside) {
-                    Box()
-                        .id(Vapor.fmtln("popover-background-{d}", .{popover.options.stable_id}))
-                        .background(.transparent)
-                        .size(.full)
-                        .pos(.full(.fixed))
-                        .zIndex(999)
-                        .children({
-                        Button(onClickOutside, .{popover})
-                            .ariaLabel("Close Popover Dropdown")
-                            .size(.full)
-                            .pos(.tl(.px(0), .px(0), .fixed))
-                            .end();
-                    });
-                }
-
+        if (popover.options.show) {
+            // Click-outside overlay to close popover
+            if (popover.options.close_on_click_outside) {
                 Box()
-                    .width(.auto)
-                    .animationEnter("opaque-popover-enter")
-                    .animationExit("opaque-popover-exit")
+                    .id(Vapor.fmtln("popover-background-{d}", .{popover.options.stable_id}))
+                    .background(.transparent)
+                    .size(.full)
+                    .pos(.full(.fixed))
+                    .zIndex(999)
+                    .children({
+                    Button(onClickOutside, .{popover})
+                        .ariaLabel("Close Popover Dropdown")
+                        .size(.full)
+                        .pos(.tl(.px(0), .px(0), .fixed))
+                        .end();
+                });
+            }
+
+            Box()
+                .width(.auto)
+                .animationEnter("opaque-popover-enter")
+                .animationExit("opaque-popover-exit")
+                .border(.round(.transparent, .all(6)))
+                .zIndex(1000)
+                .layout(.center)
+                .direction(.column)
+                .pos(.relative)
+                .margin(margin)
+                .children({
+                Box()
+                    .background(alternate_background)
+                    .padding(.xy(12, 6))
                     .border(.round(.transparent, .all(6)))
-                    .zIndex(1000)
                     .layout(.center)
                     .direction(.column)
-                    .pos(.relative)
-                    .margin(margin)
+                    .width(.auto)
                     .children({
-                    Box()
-                        .background(alternate_background)
-                        .padding(.tblr(6, 6, 12, 12))
-                        .border(.round(.transparent, .all(6)))
-                        .layout(.center)
-                        .direction(.column)
-                        .width(.auto)
-                        .children({
-                        if (popover.options.component) |component| {
-                            @call(.auto, component, .{});
-                        } else {
-                            Text(popover.options.content)
-                                .font(14, 300, alternate_text_color).end();
-                        }
-                    });
-                    // Vapor.Svg(.{ .svg = corner_svg })
-                    //     .fill(svg_color)
-                    //     .stroke(svg_color)
-                    //     .end();
+                    if (popover.options.component) |component| {
+                        @call(.auto, component, .{});
+                    } else {
+                        Text(popover.options.content)
+                            .font(14, 300, alternate_text_color).end();
+                    }
                 });
-            } else {
-                Vapor.Null();
-            }
+                // Vapor.Svg(.{ .svg = corner_svg })
+                //     .fill(svg_color)
+                //     .stroke(svg_color)
+                //     .end();
+            });
+        } else {
+            Vapor.Null();
+        }
     });
 }
 
@@ -532,7 +531,7 @@ pub fn render(popover_options: Options) void {
     // const corner_svg = getCornerSvg(position);
 
     trigger_box
-        .onEventCtx(.click, onToggle, .{popover})
+        .onEvent(.click, onToggle, .{popover})
         .anchorSource(anchor_name)
         .children({
         if (popover.options.trigger) |trigger_fn| {
@@ -541,7 +540,7 @@ pub fn render(popover_options: Options) void {
             @call(.auto, trigger_fn, .{popover.options.ctx});
         } else {
             Box()
-                .padding(.tblr(4, 4, 12, 12))
+                .padding(.xy(12, 4))
                 .background(background)
                 .duration(100)
                 .hover(.{
@@ -555,62 +554,61 @@ pub fn render(popover_options: Options) void {
     });
     Anchor(anchor_name)
         .transformOrigin(transform_origin)
-        .placement(.anchor_center)
         .onDestroy(destroy, .{popover})
         .zIndex(1000)
         .children({
-            if (popover.options.show) {
-                // Click-outside overlay to close popover
-                if (popover.options.close_on_click_outside) {
-                    Box()
-                        .id(Vapor.fmtln("popover-background-{d}", .{popover.options.stable_id}))
-                        .background(.transparent)
-                        .size(.full)
-                        .pos(.full(.fixed))
-                        .zIndex(999)
-                        .children({
-                        Button(onClickOutside, .{popover})
-                            .ariaLabel("Close Popover Dropdown")
-                            .size(.full)
-                            .pos(.tl(.px(0), .px(0), .fixed))
-                            .end();
-                    });
-                }
-
+        if (popover.options.show) {
+            // Click-outside overlay to close popover
+            if (popover.options.close_on_click_outside) {
                 Box()
-                    .width(.auto)
-                    .transformOrigin(transform_origin)
-                    .animationEnter("opaque-popover-enter")
-                    .animationExit("opaque-popover-exit")
+                    .id(Vapor.fmtln("popover-background-{d}", .{popover.options.stable_id}))
+                    .background(.transparent)
+                    .size(.full)
+                    .pos(.full(.fixed))
+                    .zIndex(999)
+                    .children({
+                    Button(onClickOutside, .{popover})
+                        .ariaLabel("Close Popover Dropdown")
+                        .size(.full)
+                        .pos(.tl(.px(0), .px(0), .fixed))
+                        .end();
+                });
+            }
+
+            Box()
+                .width(.auto)
+                .transformOrigin(transform_origin)
+                .animationEnter("opaque-popover-enter")
+                .animationExit("opaque-popover-exit")
+                .border(.round(.transparent, .all(6)))
+                .zIndex(1000)
+                .layout(.center)
+                .direction(.column)
+                .pos(.relative)
+                .margin(margin)
+                .children({
+                Box()
+                    .background(alternate_background)
+                    .padding(.xy(12, 6))
                     .border(.round(.transparent, .all(6)))
-                    .zIndex(1000)
                     .layout(.center)
                     .direction(.column)
-                    .pos(.relative)
-                    .margin(margin)
+                    .width(.auto)
                     .children({
-                    Box()
-                        .background(alternate_background)
-                        .padding(.tblr(6, 6, 12, 12))
-                        .border(.round(.transparent, .all(6)))
-                        .layout(.center)
-                        .direction(.column)
-                        .width(.auto)
-                        .children({
-                        if (popover.options.component) |component| {
-                            @call(.auto, component, .{});
-                        } else {
-                            Text(popover.options.content)
-                                .font(14, 300, alternate_text_color).end();
-                        }
-                    });
-                    // Vapor.Svg(.{ .svg = corner_svg })
-                    //     .fill(svg_color)
-                    //     .stroke(svg_color)
-                    //     .end();
+                    if (popover.options.component) |component| {
+                        @call(.auto, component, .{});
+                    } else {
+                        Text(popover.options.content)
+                            .font(14, 300, alternate_text_color).end();
+                    }
                 });
-            } else {
-                Vapor.Null();
-            }
+                // Vapor.Svg(.{ .svg = corner_svg })
+                //     .fill(svg_color)
+                //     .stroke(svg_color)
+                //     .end();
+            });
+        } else {
+            Vapor.Null();
+        }
     });
 }

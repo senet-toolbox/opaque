@@ -8,7 +8,7 @@ pub fn new() void {
 }
 
 pub fn snippet(text: []const u8) void {
-    const hash = Vapor.utils.hash(text);
+    const hash = Vapor.utils.hashKey(text);
     const copied: *bool = copies.getPtr(hash) orelse blk: {
         copies.put(hash, false) catch |err| {
             std.log.err("{any}", .{err});
@@ -21,7 +21,7 @@ pub fn snippet(text: []const u8) void {
         .padding(.all(16))
         .background(.palette(.background))
         .radius(.all(4))
-        .shadow(Vapor.Types.Shadow.insetSpread(0, 0, 2, 4, .transparentize(.black, 0.05)))
+        .shadow(Vapor.Types.Shadow.init().dropSpread(0, 0, 2, 4, .transparentize(.black, 0.05)))
         .hover(.{ .text_color = .palette(.tint) })
         .children({
         Vapor.Text(text)

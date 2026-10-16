@@ -23,7 +23,7 @@ const Stack = Vapor.Stack;
 const Text = Vapor.Text;
 const Icon = Vapor.Icon;
 const TextFmt = Vapor.TextFmt;
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 
 // ── Component Imports (adjust paths to your project) ─────────────────
 const Opaque = @import("../../components/Opaque.zig");
@@ -282,7 +282,7 @@ fn renderHeaders() void {
         .height(.expand)
         .padding(.all(12))
         .spacing(8)
-        .scroll(.scroll_y())
+        .scroll(.scrollY())
         .children({
 
         // Column labels
@@ -322,7 +322,7 @@ fn renderHeaders() void {
 
                 // Toggle
                 ButtonCtx(toggleHeader, .{hi})
-                    .size(.square_px(28))
+                    .size(.squarePx(28))
                     .pointer()
                     .layout(.center)
                     .textColor(if (header.enabled) .hex("#10b981") else .palette(.border_color_light))
@@ -335,7 +335,7 @@ fn renderHeaders() void {
 
                 // Remove
                 ButtonCtx(removeHeader, .{hi})
-                    .size(.square_px(28))
+                    .size(.squarePx(28))
                     .pointer()
                     .layout(.center)
                     .textColor(.palette(.text_color))
@@ -349,7 +349,7 @@ fn renderHeaders() void {
         // Add header button
         ButtonCtx(addHeader, .{})
             .padding(.xy(8, 4))
-            .border(.simple(.palette(.border_color_light)))
+            .border(.thin(.palette(.border_color_light)))
             .pointer()
             .textColor(.palette(.text_color))
             .hover(.{ .background = .palette(.tint), .text_color = .palette(.background) })
@@ -451,7 +451,7 @@ fn renderResponseBody() void {
     Box()
         .width(.percent(100))
         .height(.expand)
-        .scroll(.scroll_y())
+        .scroll(.scrollY())
         .padding(.all(12))
         .children({
         Text(resp.body)
@@ -471,7 +471,7 @@ fn renderResponseHeaders() void {
         .height(.expand)
         .padding(.all(12))
         .spacing(4)
-        .scroll(.scroll_y())
+        .scroll(.scrollY())
         .children({
         if (resp.headers.len == 0) {
             Text("No headers").font(14, 300, .palette(.text_color)).end();

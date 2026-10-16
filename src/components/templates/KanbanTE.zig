@@ -20,7 +20,7 @@ const Animation = Vapor.Animation;
 const Opaque = @import("../../components/Opaque.zig");
 const Button = Opaque.Button;
 const Alert = Opaque.Alert;
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 const DateTime = Vapor.DateTime;
 const ProgressCircle = Opaque.ProgressCircle;
 const ProgressBar = Opaque.ProgressBar;
@@ -31,7 +31,7 @@ const SelectStruct = @import("../../components/Select.zig");
 const ToastStruct = @import("../../components/Toast.zig");
 const SheetStruct = @import("../../components/Sheet.zig");
 const FieldStruct = @import("../../components/Field.zig");
-const TooltipStruct = @import("../../components/Tooltip.zig");
+const TooltipStruct = @import("../../components/ToolTip.zig");
 const SwitchStruct = @import("../../components/Switch.zig");
 const GroupStruct = @import("../../components/Group.zig");
 
@@ -596,7 +596,7 @@ pub fn init() void {
     priority_filter.tint_color = TE.orange;
     priority_filter.border = .sharp(.all(1), .palette(.border_color_light));
     priority_filter.selected_border = .sharp(.all(1), TE.orange);
-    priority_filter.shadow = .{ .color = .transparentizeHex(TE.orange, 0.2), .spread = 3 };
+    priority_filter.shadow = .{ .color = .transparentize(TE.orange, 0.2), .spread = 3 };
 
     status_select = .fromItems(&status_options);
     status_select.trigger = "STATUS";
@@ -682,7 +682,7 @@ fn renderNavigation() void {
             Text("VIEWS")
                 .font(9, 700, TE.text_muted)
                 .fontFamily(TE.font)
-                .margin(.b(6))
+                .margin(.{ .bottom = 6 })
                 .end();
 
             renderNavButton("BOARD", .kanban, true);
@@ -706,7 +706,7 @@ fn renderNavigation() void {
             Text("STATS")
                 .font(9, 700, TE.text_muted)
                 .fontFamily(TE.font)
-                .margin(.b(6))
+                .margin(.{ .bottom = 6 })
                 .end();
 
             renderStatRow("TOTAL", totalTaskCount());
@@ -763,14 +763,14 @@ fn renderNavButton(label_text: []const u8, nav_icon: *const Vapor.IconTokens, is
     Box()
         .width(.percent(100))
         .padding(.xy(10, 6))
-        .background(if (is_active) .transparentizeHex(TE.orange, 0.15) else .transparent)
+        .background(if (is_active) .transparentize(TE.orange, 0.15) else .transparent)
         .border(.solid(.all(if (is_active) TE.border_w else 0), if (is_active) TE.orange else .transparent, .all(TE.radius_sm)))
         .layout(.left_center)
         .spacing(10)
         .pointer()
         .duration(100)
         .hover(.{
-            .background = if (is_active) .transparentizeHex(TE.orange, 0.15) else .palette(.highlight_color),
+            .background = if (is_active) .transparentize(TE.orange, 0.15) else .palette(.highlight_color),
         })
         .children({
         Box()
@@ -988,7 +988,7 @@ fn renderBoard() void {
         .padding(.all(20))
         .layout(.top_left)
         .spacing(12)
-        .scroll(.scroll_x())
+        .scroll(.scrollX())
         .children({
         for (std.enums.values(TaskStatus)) |status| {
             if (status == .done and !show_completed) continue;
@@ -1069,7 +1069,7 @@ fn renderColumn(status: TaskStatus, collection: *TaskCollection) void {
                 .width(.percent(100))
                 .height(.grow)
                 .spacing(6)
-                .scroll(.scroll_y());
+                .scroll(.scrollY());
             surface
                 .render(renderTaskCard);
         });
@@ -1125,7 +1125,7 @@ fn TooltipContent(task: *Task) void {
                 .end();
             Box()
                 .padding(.xy(6, 3))
-                .background(.transparentizeHex(task.priority.color(), 0.2))
+                .background(.transparentize(task.priority.color(), 0.2))
                 .border(.solid(.all(1), task.priority.color(), .all(TE.radius_sm)))
                 .children({
                 Text(task.priority.label())
@@ -1284,7 +1284,7 @@ fn renderTaskCard(task: *Task, index: usize, state: Sortable.ItemState) void {
             // Priority — bold color chip
             Box()
                 .padding(.xy(5, 2))
-                .background(.transparentizeHex(task.priority.color(), 0.2))
+                .background(.transparentize(task.priority.color(), 0.2))
                 .border(.solid(.all(1), task.priority.color(), .all(TE.radius_sm)))
                 .children({
                 Text(task.priority.label())
@@ -1322,7 +1322,7 @@ fn renderTaskCard(task: *Task, index: usize, state: Sortable.ItemState) void {
         Box()
             .width(.percent(100))
             .layout(.x_between_center)
-            .padding(.t(6))
+            .padding(.{ .top = 6 })
             .border(.top(TE.border_w, TE.border_light))
             .children({
             Box()
@@ -1468,7 +1468,7 @@ fn renderDragOverlay(task: ?*Task, delta_x: f32, delta_y: f32) void {
                     .end();
                 Box()
                     .padding(.xy(5, 2))
-                    .background(.transparentizeHex(t.priority.color(), 0.2))
+                    .background(.transparentize(t.priority.color(), 0.2))
                     .border(.solid(.all(1), t.priority.color(), .all(TE.radius_sm)))
                     .children({
                     Text(t.priority.label())
@@ -1488,7 +1488,7 @@ fn renderDragOverlay(task: ?*Task, delta_x: f32, delta_y: f32) void {
             // Status badge
             Box()
                 .padding(.xy(6, 3))
-                .background(.transparentizeHex(t.status.color(), 0.15))
+                .background(.transparentize(t.status.color(), 0.15))
                 .border(.solid(.all(1), t.status.color(), .all(TE.radius_sm)))
                 .children({
                 Text(t.status.label())
@@ -1527,7 +1527,7 @@ fn renderAddModal(_: *Alert) void {
         // Header — TE panel style
         Box()
             .layout(.x_between_center)
-            .padding(.b(12))
+            .padding(.{ .bottom = 12 })
             .border(.bottom(TE.border_w, TE.border))
             .children({
             Box()
@@ -1596,8 +1596,8 @@ fn renderAddModal(_: *Alert) void {
                         .ariaLabel("Text Area")
                         .width(.percent(100))
                         .height(.percent(100))
-                        .outline(.none)
-                        .border(.solid(.tblr(TE.border_w, 4, TE.border_w, TE.border_w), TE.border, .all(TE.radius_sm)))
+                        .outline(.none, null)
+                        .border(.solid(.{ .top = TE.border_w, .bottom = 4, .left = TE.border_w, .right = TE.border_w }, TE.border, .all(TE.radius_sm)))
                         .padding(.all(8))
                         .font(12, 400, .palette(.text_color))
                         .fontFamily(TE.font)
@@ -1682,7 +1682,7 @@ fn renderAddModal(_: *Alert) void {
         Box()
             .layout(.right_center)
             .spacing(8)
-            .margin(.t(4))
+            .margin(.{ .top = 4 })
             .children({
             Button(closeAddModal, .{})
                 .padding(.xy(14, 8))
@@ -1722,7 +1722,7 @@ fn renderDetailSheetContent(_: *Sheet) void {
             // Header
             Box()
                 .layout(.x_between_center)
-                .padding(.b(12))
+                .padding(.{ .bottom = 12 })
                 .border(.bottom(TE.border_w, TE.border))
                 .children({
                 Box()
@@ -1772,7 +1772,7 @@ fn renderDetailSheetContent(_: *Sheet) void {
                     .children({
                     Box()
                         .padding(.xy(8, 4))
-                        .background(.transparentizeHex(task.status.color(), 0.2))
+                        .background(.transparentize(task.status.color(), 0.2))
                         .border(.solid(.all(1), task.status.color(), .all(TE.radius_sm)))
                         .children({
                         Text(task.status.label())
@@ -1782,7 +1782,7 @@ fn renderDetailSheetContent(_: *Sheet) void {
                     });
                     Box()
                         .padding(.xy(8, 4))
-                        .background(.transparentizeHex(task.priority.color(), 0.2))
+                        .background(.transparentize(task.priority.color(), 0.2))
                         .border(.solid(.all(1), task.priority.color(), .all(TE.radius_sm)))
                         .children({
                         Text(task.priority.label())

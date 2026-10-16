@@ -12,7 +12,7 @@ const Animation = Vapor.Animation;
 const Opaque = @import("../../components/Opaque.zig");
 const Button = Opaque.Button;
 const Alert = Opaque.Alert;
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 const DateTime = Vapor.DateTime;
 const ProgressCircle = Opaque.ProgressCircle;
 const ProgressBar = Opaque.ProgressBar;
@@ -22,7 +22,7 @@ const SelectStruct = @import("../../components/Select.zig");
 const ToastStruct = @import("../../components/Toast.zig");
 const SheetStruct = @import("../../components/Sheet.zig");
 const FieldStruct = @import("../../components/Field.zig");
-const TooltipStruct = @import("../../components/Tooltip.zig");
+const TooltipStruct = @import("../../components/ToolTip.zig");
 const SwitchStruct = @import("../../components/Switch.zig");
 const GroupStruct = @import("../../components/Group.zig");
 
@@ -260,7 +260,7 @@ fn initSampleData() void {
         .{ .id = 8, .title = "Performance audit", .description = "Run Lighthouse and optimize critical metrics", .status = .backlog, .priority = .low, .assignee = null, .tags = &.{"performance"}, .due_date = null, .created_at = "Jan 12" },
         .{ .id = 9, .title = "Notification system", .description = "Build real-time notification infrastructure", .status = .todo, .priority = .high, .assignee = "Alex", .tags = &.{ "backend", "realtime" }, .due_date = DateTime.fromDayMonthYear(3, 6, 2026), .created_at = "Jan 10" },
         .{ .id = 10, .title = "Settings page", .description = "User preferences and account settings UI", .status = .review, .priority = .medium, .assignee = "Sarah", .tags = &.{ "frontend", "ui" }, .due_date = DateTime.fromDayMonthYear(28, 4, 2026), .created_at = "Jan 8" },
-    }) catch |err| Vapor.printErr("Failed to init tasks: {any}", .{err});
+    }) catch |err| Vapor.print(.err, "Failed to init tasks: {any}", .{err});
 
     for (tasks.items) |*task| {
         var progress_circle = createProgressCircle();
@@ -476,7 +476,7 @@ fn renderNavigation() void {
             Text("VIEWS")
                 .font(10, 600, Theme.text_muted)
                 .fontFamily("Montserrat")
-                .margin(.b(8))
+                .margin(.{ .bottom = 8 })
                 .end();
 
             renderNavButton("Board", .kanban, true);
@@ -493,7 +493,7 @@ fn renderNavigation() void {
             Text("STATISTICS")
                 .font(10, 600, Theme.text_muted)
                 .fontFamily("Montserrat")
-                .margin(.b(8))
+                .margin(.{ .bottom = 8 })
                 .end();
 
             renderStatRow("Total Tasks", tasks.items.len);
@@ -535,15 +535,15 @@ fn renderNavButton(label: []const u8, nav_icon: *const Vapor.IconTokens, is_acti
     Box()
         .width(.percent(100))
         .padding(.xy(14, 4))
-        .background(if (is_active) .transparentizeHex(.palette(.tint), 0.1) else .transparent)
-        .border(.r(1, if (is_active) .palette(.tint) else .transparent))
-        .layer(if (is_active) .dot(0.5, 6, .transparentizeHex(.palette(.tint), 0.3)) else null)
+        .background(if (is_active) .transparentize(.palette(.tint), 0.1) else .transparent)
+        .border(.right(1, if (is_active) .palette(.tint) else .transparent))
+        .layer(if (is_active) .dot(0.5, 6, .transparentize(.palette(.tint), 0.3)) else null)
         .layout(.left_center)
         .spacing(12)
         .pointer()
         .duration(150)
         .hover(.{
-            .background = if (is_active) .transparentizeHex(.palette(.tint), 0.1) else .palette(.highlight_color),
+            .background = if (is_active) .transparentize(.palette(.tint), 0.1) else .palette(.highlight_color),
         })
         .children({
         Box()
@@ -717,7 +717,7 @@ fn renderBoard() void {
         .padding(.all(28))
         .layout(.top_left)
         .spacing(20)
-        .scroll(.scroll_x())
+        .scroll(.scrollX())
         .children({
         // Render columns for each status
         for (std.enums.values(TaskStatus)) |status| {
@@ -780,7 +780,7 @@ fn renderColumn(status: TaskStatus) void {
             .width(.percent(100))
             .height(.grow)
             .spacing(10)
-            .scroll(.scroll_y())
+            .scroll(.scrollY())
             .children({
             for (tasks.items) |*task| {
                 if (task.status != status) continue;
@@ -855,7 +855,7 @@ fn TooltipContent(task: *Task) void {
                 .end();
             Box()
                 .padding(.xy(8, 4))
-                .background(.transparentizeHex(task.priority.color(), 0.2))
+                .background(.transparentize(task.priority.color(), 0.2))
                 .border(.round(task.priority.color(), .all(6)))
                 .children({
                 Text(task.priority.label())
@@ -988,7 +988,7 @@ fn TooltipTrigger(_: []const u8) void {
 fn renderTaskCard(task: *Task) void {
     Box()
         .width(.percent(100))
-        .padding(.t(14))
+        .padding(.{ .top = 14 })
         .animationEnter("kanban-card-enter")
         .border(.round(.palette(.border_color_light), .all(20)))
         .direction(.column)
@@ -1264,8 +1264,8 @@ fn renderAddModal(_: *Alert) void {
                         .ariaLabel("Text Area")
                         .width(.percent(100))
                         .height(.percent(100))
-                        .outline(.none)
-                        .border(.solid(.tblr(1, 3, 1, 1), .palette(.border_color_light), .all(6)))
+                        .outline(.none, null)
+                        .border(.solid(.{ .top = 1, .bottom = 3, .left = 1, .right = 1 }, .palette(.border_color_light), .all(6)))
                         .padding(.all(8))
                         .font(16, 300, .palette(.text_color))
                         .fontFamily("IBM Plex Sans,monospace")
@@ -1352,7 +1352,7 @@ fn renderAddModal(_: *Alert) void {
         Box()
             .layout(.right_center)
             .spacing(12)
-            .margin(.t(8))
+            .margin(.{ .top = 8 })
             .children({
             Button(closeAddModal, .{})
                 .background(.palette(.text_color))
@@ -1431,7 +1431,7 @@ fn renderDetailSheetContent(_: *Sheet) void {
                     .children({
                     Box()
                         .padding(.xy(10, 6))
-                        .background(.transparentizeHex(task.status.color(), 0.2))
+                        .background(.transparentize(task.status.color(), 0.2))
                         .border(.round(task.status.color(), .all(6)))
                         .children({
                         Text(task.status.label())
@@ -1441,7 +1441,7 @@ fn renderDetailSheetContent(_: *Sheet) void {
                     });
                     Box()
                         .padding(.xy(10, 6))
-                        .background(.transparentizeHex(task.priority.color(), 0.2))
+                        .background(.transparentize(task.priority.color(), 0.2))
                         .border(.round(task.priority.color(), .all(6)))
                         .children({
                         Text(task.priority.label())

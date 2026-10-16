@@ -2,11 +2,11 @@ const std = @import("std");
 const Vapor = @import("vapor");
 const Box = Vapor.Box;
 const Text = Vapor.Text;
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 const Icon = Vapor.Icon;
 const List = Vapor.List;
 const ListItem = Vapor.ListItem;
-const CtxButton = Vapor.CtxButton;
+const CtxButton = Vapor.Button;
 const Link = Vapor.Link;
 const RedirectLink = Vapor.RedirectLink;
 const Button = Vapor.Button;
@@ -55,14 +55,14 @@ const slide_in = Vapor.Animation.init("sidebar-slide-in")
 pub const MenuItem = struct {
     title: []const u8,
     link: []const u8,
-    icon: Vapor.IconType,
+    icon: Vapor.IconTokens,
 };
 
 pub const GroupItem = struct {
     title: []const u8,
     items: []const MenuItem,
     show: bool = false,
-    icon: Vapor.IconType,
+    icon: Vapor.IconTokens,
 };
 
 pub fn init() void {
@@ -131,7 +131,10 @@ fn LargeMenu(sidebar: *SideBar) void {
                 .pos(.relative)
                 .size(.hw(.fit, .percent(100)))
                 .children({
-                CtxButton(onGroupClick, .{ sidebar, group }).style(Styles.GroupStyle).children({
+                CtxButton(onGroupClick, .{ sidebar, group })
+                    .a11y(Vapor.Accessibility.init().setExpanded(group.show))
+                    .style(Styles.GroupStyle)
+                    .children({
                     Box()
                         .layout(.left_center)
                         .spacing(12)
@@ -151,65 +154,67 @@ fn LargeMenu(sidebar: *SideBar) void {
                 });
 
                 List()
+                    // A collapsed group is still on the page (it animates
+                    // shut), so screen readers are told to skip it.
+                    .a11y(Vapor.Accessibility.init().setHidden(!group.show))
                     .listStyle(.none)
                     .pos(.relative)
                     .scroll(if (group.show) .{} else .none())
                     .size(.hw(if (group.show) .fit else .px(0), .percent(100)))
                     .transition(.{ .properties = &.{ .height, .opacity, .padding }, .duration = 150, .timing = .easeOut })
                     .opacity(if (group.show) 1.0 else 0.0)
-                    .padding(if (group.show) .tblr(10, 10, 8, 8) else .all(0))
-                    .border(.l(1, .palette(.text_color)))
-                    .margin(.l(16))
+                    .padding(if (group.show) .xy(8, 10) else .all(0))
+                    .border(.left(1, .palette(.text_color)))
+                    .margin(.{ .left = 16 })
+                    .direction(.row)
+                    .layout(.left_center)
+                    .spacing(12)
+                    .wrap(.wrap)
                     .children({
-                    Box()
-                        .direction(.row)
-                        .layout(.left_center)
-                        .spacing(12)
-                        .wrap(.wrap)
-                        .children({
-                        for (group.items) |*item| {
-                            const uuid = Vapor.fmtln("menu-{s}", .{item.link});
-                            ListItem()
-                                .id(uuid)
-                                .pos(.relative)
-                                .size(.hw(.fit, .percent(100)))
-                                .duration(100)
-                                .background(if (std.mem.eql(u8, current_path, item.link)) .transparentizeHex(.palette(.text_color), 1) else .transparent)
-                                .border(.solid(.all(1), if (std.mem.eql(u8, current_path, item.link)) .palette(.text_color) else .transparent, .all(12)))
-                                .hover(.{
-                                    .background = if (std.mem.eql(u8, current_path, item.link)) .palette(.text_color) else .palette(.highlight_color),
-                                })
-                                .children({
-                                Box().pos(.tl(.percent(50), .px(-11), .absolute))
-                                    .background(.palette(.text_color))
-                                    .radius(.all(99))
-                                    .width(.px(3)).height(.px(3)).children({});
-                                ButtonCtx(onItemClick, .{ sidebar, item })
-                                    .style(&.{
-                                        .visual = Vapor.Types.Visual{
-                                            .text_decoration = .none,
-                                            .cursor = .pointer,
-                                            .background = .transparent,
-                                            .border = .{ .radius = .all(12) },
-                                            .outline_color = .palette(.border_color_light),
-                                        },
-                                        .size = .w(.percent(100)),
-                                        .layout = .left_center,
-                                        .child_gap = 12,
-                                        .padding = .xy(10, 8),
-                                    }).children({
-                                    Icon(item.icon).font(16, 300, if (std.mem.eql(u8, current_path, item.link)) .palette(.background) else .palette(.text_color)).end();
-                                    Text(item.title).style(&.{
-                                        .visual = .{
-                                            .text_color = if (std.mem.eql(u8, current_path, item.link)) .palette(.background) else .palette(.text_color),
-                                            .font_size = 14,
-                                        },
-                                        .font_family = "Montserrat",
-                                    }).end();
-                                });
+                    for (group.items) |*item| {
+                        const uuid = Vapor.fmtln("menu-{s}", .{item.link});
+                        ListItem()
+                            .id(uuid)
+                            .pos(.relative)
+                            .size(.hw(.fit, .percent(100)))
+                            .duration(100)
+                            .background(if (std.mem.eql(u8, current_path, item.link)) .transparentize(.palette(.text_color), 1) else .transparent)
+                            .border(.solid(.all(1), if (std.mem.eql(u8, current_path, item.link)) .palette(.text_color) else .transparent, .all(12)))
+                            .hover(.{
+                                .background = if (std.mem.eql(u8, current_path, item.link)) .palette(.text_color) else .palette(.highlight_color),
+                            })
+                            .children({
+                            Box().pos(.tl(.percent(50), .px(-11), .absolute))
+                                .background(.palette(.text_color))
+                                .radius(.all(99))
+                                .width(.px(3)).height(.px(3)).children({});
+                            ButtonCtx(onItemClick, .{ sidebar, item })
+                                .a11y(Vapor.Accessibility.init().setPressed(if (std.mem.eql(u8, current_path, item.link)) .true_val else .false_val))
+                                .tabIndex(if (group.show) 0 else -1)
+                                .style(&.{
+                                    .visual = Vapor.Types.Visual{
+                                        .text_decoration = .none,
+                                        .cursor = .pointer,
+                                        .background = .transparent,
+                                        .border = .{ .radius = .all(12) },
+                                        .outline_color = .palette(.border_color_light),
+                                    },
+                                    .size = .w(.percent(100)),
+                                    .layout = .left_center,
+                                    .child_gap = 12,
+                                    .padding = .xy(10, 8),
+                                }).children({
+                                Icon(item.icon).font(16, 300, if (std.mem.eql(u8, current_path, item.link)) .palette(.background) else .palette(.text_color)).end();
+                                Text(item.title).style(&.{
+                                    .visual = .{
+                                        .text_color = if (std.mem.eql(u8, current_path, item.link)) .palette(.background) else .palette(.text_color),
+                                        .font_size = 14,
+                                    },
+                                    .font_family = "Montserrat",
+                                }).end();
                             });
-                        }
-                    });
+                        });
+                    }
                 });
             });
         }
@@ -221,66 +226,64 @@ fn LargeMenu(sidebar: *SideBar) void {
             .size(.hw(.fit, .percent(100)))
             .transition(.{ .properties = &.{ .height, .opacity, .padding }, .duration = 150, .timing = .easeOut })
             .opacity(1.0)
-            .padding(.tblr(10, 10, 8, 8))
-            .border(.l(1, .palette(.text_color)))
-            .margin(.l(16))
+            .padding(.xy(8, 10))
+            .border(.left(1, .palette(.text_color)))
+            .margin(.{ .left = 16 })
+            .direction(.row)
+            .layout(.left_center)
+            .spacing(12)
+            .wrap(.wrap)
             .children({
-            Box()
-                .direction(.row)
-                .layout(.left_center)
-                .spacing(12)
-                .wrap(.wrap)
-                .children({
-                for (items) |*item| {
-                    const active = if (sidebar.selected_item) |selected_item| blk: {
-                        if (selected_item == item) break :blk true;
-                        if (std.mem.eql(u8, selected_item.link, item.link)) {
-                            break :blk true;
-                        }
-                        break :blk false;
-                    } else false;
-                    const uuid = Vapor.fmtln("menu-{s}", .{item.link});
-                    ListItem()
-                        .id(uuid)
-                        .pos(.relative)
-                        .size(.hw(.fit, .percent(100)))
-                        .duration(100)
-                        .background(if (active) .transparentizeHex(.palette(.text_color), 1) else .transparent)
-                        .border(.solid(.all(1), if (active) .palette(.text_color) else .transparent, .all(12)))
-                        .hover(.{
-                            .background = if (active) .palette(.text_color) else .palette(.highlight_color),
-                        })
-                        .children({
-                        Box().pos(.tl(.percent(50), .px(-11), .absolute))
-                            .background(.palette(.text_color))
-                            .radius(.all(99))
-                            .width(.px(3)).height(.px(3)).children({});
-                        ButtonCtx(onItemClick, .{ sidebar, item })
-                            .style(&.{
-                                .visual = Vapor.Types.Visual{
-                                    .text_decoration = .none,
-                                    .cursor = .pointer,
-                                    .background = .transparent,
-                                    .border = .{ .radius = .all(12) },
-                                    .outline_color = .palette(.border_color_light),
-                                },
-                                .size = .w(.percent(100)),
-                                .layout = .left_center,
-                                .child_gap = 12,
-                                .padding = .xy(10, 8),
-                            }).children({
-                            Icon(item.icon).font(16, 300, if (active) .palette(.background) else .palette(.text_color)).end();
-                            Text(item.title).style(&.{
-                                .visual = .{
-                                    .text_color = if (active) .palette(.background) else .palette(.text_color),
-                                    .font_size = 14,
-                                },
-                                .font_family = "Montserrat",
-                            }).end();
-                        });
+            for (items) |*item| {
+                const active = if (sidebar.selected_item) |selected_item| blk: {
+                    if (selected_item == item) break :blk true;
+                    if (std.mem.eql(u8, selected_item.link, item.link)) {
+                        break :blk true;
+                    }
+                    break :blk false;
+                } else false;
+                const uuid = Vapor.fmtln("menu-{s}", .{item.link});
+                ListItem()
+                    .id(uuid)
+                    .pos(.relative)
+                    .size(.hw(.fit, .percent(100)))
+                    .duration(100)
+                    .background(if (active) .transparentize(.palette(.text_color), 1) else .transparent)
+                    .border(.solid(.all(1), if (active) .palette(.text_color) else .transparent, .all(12)))
+                    .hover(.{
+                        .background = if (active) .palette(.text_color) else .palette(.highlight_color),
+                    })
+                    .children({
+                    Box().pos(.tl(.percent(50), .px(-11), .absolute))
+                        .background(.palette(.text_color))
+                        .radius(.all(99))
+                        .width(.px(3)).height(.px(3)).children({});
+                    ButtonCtx(onItemClick, .{ sidebar, item })
+                        .a11y(Vapor.Accessibility.init().setPressed(if (active) .true_val else .false_val))
+                        .style(&.{
+                            .visual = Vapor.Types.Visual{
+                                .text_decoration = .none,
+                                .cursor = .pointer,
+                                .background = .transparent,
+                                .border = .{ .radius = .all(12) },
+                                .outline_color = .palette(.border_color_light),
+                            },
+                            .size = .w(.percent(100)),
+                            .layout = .left_center,
+                            .child_gap = 12,
+                            .padding = .xy(10, 8),
+                        }).children({
+                        Icon(item.icon).font(16, 300, if (active) .palette(.background) else .palette(.text_color)).end();
+                        Text(item.title).style(&.{
+                            .visual = .{
+                                .text_color = if (active) .palette(.background) else .palette(.text_color),
+                                .font_size = 14,
+                            },
+                            .font_family = "Montserrat",
+                        }).end();
                     });
-                }
-            });
+                });
+            }
         });
     }
 }
@@ -304,7 +307,7 @@ fn SmallMenu(sidebar: *SideBar) void {
 }
 
 fn mount(sidebar: *SideBar) void {
-    const current_path = Vapor.Kit.getWindowPath();
+    const current_path = Vapor.currentPath();
     sidebar.current_path = current_path;
 }
 
@@ -322,13 +325,15 @@ pub fn render(sidebar: *SideBar) void {
             .children({
             Box()
                 .size(.hw(.fit, sidebar_width))
-                .margin(.l(10))
+                .margin(.{ .left = 10 })
                 .layout(.left_center)
                 .spacing(8)
                 .transformOrigin(.left)
                 .transition(.{ .properties = &.{ .transform, .width, .opacity, .padding }, .duration = 150, .timing = .easeInOut })
                 .children({
                 ButtonCtx(toggleMenu, .{sidebar})
+                    .a11y(Vapor.Accessibility.init().setExpanded(sidebar.show_menu))
+                    .ariaLabel("Toggle menu")
                     .background(.palette(.text_color))
                     .layout(.left_center)
                     .padding(.xy(4, 2))

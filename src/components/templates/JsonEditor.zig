@@ -37,8 +37,8 @@ editor_padding_top: f32 = 12,
 editor_padding_left: f32 = 12,
 
 hover_tooltip: HoverTooltip = .{},
-editor_container: Vapor.Binded = .{},
-text_area: Vapor.Binded = .{},
+editor_container: Vapor.Element = .{},
+text_area: Vapor.Element = .{},
 new_cursor_pos: usize = 0,
 var last_time: i64 = 0;
 
@@ -253,7 +253,7 @@ fn onKeyUp(self: *JsonEditor, evt: *Vapor.Event) void {
 
 const HoverTooltip = struct {
     visible: bool = false,
-    binded: Vapor.Binded = .{},
+    binded: Vapor.Element = .{},
     x: f32 = 0,
     y: f32 = 0,
     token_text: []const u8 = "",
@@ -440,7 +440,7 @@ fn toggleLineComment(self: *JsonEditor, evt: *Vapor.Event) void {
     self.replaceText(line_start, line_end, result.items);
     self.new_cursor_pos = line_start + result.items.len;
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn toggleSingleLineComment(self: *JsonEditor, _: *Vapor.Event) void {
@@ -470,7 +470,7 @@ fn toggleSingleLineComment(self: *JsonEditor, _: *Vapor.Event) void {
 
     self.replaceText(line_bounds.start, line_bounds.end, result);
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn insertAutoClosePair(self: *JsonEditor, open: u8, close: u8) void {
@@ -486,7 +486,7 @@ fn insertAutoClosePair(self: *JsonEditor, open: u8, close: u8) void {
     } else {
         if (open == close and cursor_pos < self.text.len and self.text[cursor_pos] == close) {
             self.new_cursor_pos = cursor_pos + 1;
-            Vapor.onEndCtx(updateCursorPosition, .{self});
+            Vapor.onLayout(updateCursorPosition, .{self});
             return;
         }
         const pair = std.fmt.allocPrint(Vapor.arena(.frame), "{c}{c}", .{ open, close }) catch unreachable;
@@ -495,14 +495,14 @@ fn insertAutoClosePair(self: *JsonEditor, open: u8, close: u8) void {
         self.new_cursor_pos = cursor_pos + 1;
     }
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn trySkipClosingChar(self: *JsonEditor, close: u8) bool {
     const cursor_pos = self.text_area.cursorPosition();
     if (cursor_pos < self.text.len and self.text[cursor_pos] == close) {
         self.new_cursor_pos = cursor_pos + 1;
-        Vapor.onEndCtx(updateCursorPosition, .{self});
+        Vapor.onLayout(updateCursorPosition, .{self});
         return true;
     }
     return false;
@@ -520,7 +520,7 @@ fn tryDeletePair(self: *JsonEditor) bool {
             self.text = std.fmt.bufPrint(&self.buffer, "{s}", .{total}) catch unreachable;
             self.new_cursor_pos = cursor_pos - 1;
             self.recompile();
-            Vapor.onEndCtx(updateCursorPosition, .{self});
+            Vapor.onLayout(updateCursorPosition, .{self});
             return true;
         }
     }
@@ -571,7 +571,7 @@ fn handleEnter(self: *JsonEditor) void {
     }
 
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn handleTab(self: *JsonEditor, shift: bool) void {
@@ -589,7 +589,7 @@ fn handleTab(self: *JsonEditor, shift: bool) void {
             self.text = std.fmt.bufPrint(&self.buffer, "{s}", .{total}) catch unreachable;
             self.new_cursor_pos = cursor_pos + indent.len;
             self.recompile();
-            Vapor.onEndCtx(updateCursorPosition, .{self});
+            Vapor.onLayout(updateCursorPosition, .{self});
         }
     }
 }
@@ -611,7 +611,7 @@ fn handleIndent(self: *JsonEditor, start: usize, end: usize) void {
     self.text = std.fmt.bufPrint(&self.buffer, "{s}", .{total}) catch unreachable;
     self.new_cursor_pos = start + 2;
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn handleOutdent(self: *JsonEditor, start: usize, end: usize) void {
@@ -635,7 +635,7 @@ fn handleOutdent(self: *JsonEditor, start: usize, end: usize) void {
     self.text = std.fmt.bufPrint(&self.buffer, "{s}", .{total}) catch unreachable;
     self.new_cursor_pos = if (start >= 2) start - 2 else start;
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn outdentCurrentLine(self: *JsonEditor) void {
@@ -652,7 +652,7 @@ fn outdentCurrentLine(self: *JsonEditor) void {
     self.text = std.fmt.bufPrint(&self.buffer, "{s}", .{total}) catch unreachable;
     self.new_cursor_pos = if (cursor_pos >= skip) cursor_pos - skip else cursor_pos;
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 const LineBounds = struct { start: usize, end: usize };
@@ -676,7 +676,7 @@ fn moveLineUp(self: *JsonEditor) void {
     self.text = std.fmt.bufPrint(&self.buffer, "{s}", .{total}) catch unreachable;
     self.new_cursor_pos = prev_line_start + (cursor_pos - line_bounds.start);
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn moveLineDown(self: *JsonEditor) void {
@@ -692,7 +692,7 @@ fn moveLineDown(self: *JsonEditor) void {
     self.text = std.fmt.bufPrint(&self.buffer, "{s}", .{total}) catch unreachable;
     self.new_cursor_pos = next_line_start + next_line.len + 1 + (cursor_pos - line_bounds.start);
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn duplicateLine(self: *JsonEditor) void {
@@ -704,7 +704,7 @@ fn duplicateLine(self: *JsonEditor) void {
     self.text = std.fmt.bufPrint(&self.buffer, "{s}", .{total}) catch unreachable;
     self.new_cursor_pos = line_bounds.end + 1 + (cursor_pos - line_bounds.start);
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn deleteLine(self: *JsonEditor) void {
@@ -715,7 +715,7 @@ fn deleteLine(self: *JsonEditor) void {
     self.text = std.fmt.bufPrint(&self.buffer, "{s}", .{total}) catch unreachable;
     self.new_cursor_pos = line_bounds.start;
     self.recompile();
-    Vapor.onEndCtx(updateCursorPosition, .{self});
+    Vapor.onLayout(updateCursorPosition, .{self});
 }
 
 fn updateCursorPosition(self: *JsonEditor) void {
@@ -753,7 +753,7 @@ fn onScroll(self: *JsonEditor, _: *Vapor.Event) void {
     self.hideHoverTooltip();
 }
 
-var binded_highlighter: Vapor.Binded = .{};
+var binded_highlighter: Vapor.Element = .{};
 
 var copied: bool = false;
 fn copy(self: *JsonEditor) void {
@@ -776,7 +776,7 @@ fn onDrag(draggable: *Vapor.Draggable, _: *Vapor.Event) void {
 // Render
 // ============================================================================
 
-var container: Vapor.Binded = .{};
+var container: Vapor.Element = .{};
 
 pub fn render(self: *JsonEditor) void {
     Vapor.Stack()
@@ -801,7 +801,7 @@ pub fn render(self: *JsonEditor) void {
             Vapor.ButtonCtx(copy, .{self})
                 .cursor(.pointer)
                 .background(.transparent)
-                .size(.square_px(24))
+                .size(.squarePx(24))
                 .children({
                 if (copied) {
                     Icon(.check)
@@ -831,7 +831,7 @@ pub fn render(self: *JsonEditor) void {
                 .height(.percent(100))
                 .width(.percent(100))
                 .padding(.horizontal(12))
-                .scroll(.scroll_y())
+                .scroll(.scrollY())
                 .pos(.tl(.percent(0), .percent(0), .absolute)).children({
                 self.highlighter.render() catch unreachable;
             });
@@ -849,23 +849,23 @@ pub fn render(self: *JsonEditor) void {
                     .val(&self.text)
                     .placeholder(self.text)
                     .width(.percent(100))
-                    .outline(.none)
+                    .outline(.none, null)
                     .border(.none)
                     .resize(.none)
-                    .border(.simple(.transparent))
+                    .border(.thin(.transparent))
                     .height(.percent(100))
-                    .whitespace(.pre)
-                    .padding(.tblr(11, 0, 47, 0))
+                    .whiteSpace(.pre)
+                    .padding(.{ .top = 11, .left = 47 })
                     .fontFamily("DM Mono, monospace")
                     .caret(.{ .type = .block, .color = .white })
                     .textDecoration(.none)
                     .font(15, 400, .transparent)
-                    .onEventCtx(.scroll, onScroll, .{self})
-                    .onEventCtx(.input, onChange, .{self})
-                    .onEventCtx(.keydown, onKeyDown, .{self})
-                    .onEventCtx(.keyup, onKeyUp, .{self})
-                    .onEventCtx(.pointermove, onPointerMove, .{self})
-                    .onEventCtx(.pointerleave, onPointerLeave, .{self})
+                    .onEvent(.scroll, onScroll, .{self})
+                    .onEvent(.input, onChange, .{self})
+                    .onEvent(.keydown, onKeyDown, .{self})
+                    .onEvent(.keyup, onKeyUp, .{self})
+                    .onEvent(.pointermove, onPointerMove, .{self})
+                    .onEvent(.pointerleave, onPointerLeave, .{self})
                     .end();
             });
 
@@ -902,7 +902,7 @@ fn renderHoverTooltip(self: *JsonEditor) void {
                     .spacing(6)
                     .children({
                     Box()
-                        .size(.square_px(6))
+                        .size(.squarePx(6))
                         .radius(.all(3))
                         .background(.hex("#f44747"))
                         .children({});

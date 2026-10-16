@@ -269,24 +269,24 @@ pub fn init() void {
             .size = .w(.percent(100)),
             .margin = .{ .top = 32 },
             .visual = .{
-                .border = .round(.transparentizeHex(.palette(.alternate_background), 0.5), .all(4)),
-                .background = .transparentizeHex(.palette(.alternate_background), 0.9),
+                .border = .round(.transparentize(.palette(.alternate_background), 0.5), .all(4)),
+                .background = .transparentize(.palette(.alternate_background), 0.9),
                 .cursor = .pointer,
                 .font_size = 16,
                 .text_color = .white,
                 .new_shadow = Vapor.Types.NewShadow.init()
-                    .inset(0, -2, .transparentizeHex(.palette(.alternate_background), 0.5))
-                    .drop(0, 1, 3, .transparentizeHex(.palette(.alternate_background), 0.1)),
+                    .inset(0, -2, .transparentize(.palette(.alternate_background), 0.5))
+                    .drop(0, 1, 3, .transparentize(.palette(.alternate_background), 0.1)),
             },
             .transition = .{ .duration = 100 },
             .interactive = .{
                 .hover = .{
                     .new_shadow = Vapor.Types.NewShadow.init()
-                        .inset(0, -2, .transparentizeHex(.black, 0))
-                        .drop(0, 1, 3, .transparentizeHex(.black, 0)),
+                        .inset(0, -2, .transparentize(.black, 0))
+                        .drop(0, 1, 3, .transparentize(.black, 0)),
                 },
             },
-            .padding = .tblr(4, 4, 8, 8),
+            .padding = .xy(8, 4),
             .child_gap = 8,
             .font_family = "IBM Plex Sans,monospace",
         },
@@ -411,7 +411,7 @@ fn toggleCart() void {
 }
 
 fn closeCart() void {
-    Vapor.Kit.navigate("/te-store/checkout");
+    Vapor.navigate("/te-store/checkout");
     cart_open = false;
 }
 
@@ -458,7 +458,7 @@ fn updateQuantity(index: usize, delta: i32) void {
 
 fn selectProduct(id: usize) void {
     selected_product_id = id;
-    Vapor.Kit.navigate("/te-store/product");
+    Vapor.navigate("/te-store/product");
 }
 
 fn setHoveredProduct(id: usize, _: *Vapor.Event) void {
@@ -702,7 +702,7 @@ fn renderProductGrid() void {
     Box()
         .width(.percent(100))
         .padding(.all(24))
-        .padding(.t(0))
+        .padding(.none)
         .background(Theme.bg_base)
         .children({
         // Grid of products
@@ -733,7 +733,7 @@ fn renderProductCard(product: *const Product) void {
         .border(.bottom(1, Theme.border_light))
         .border(.right(1, Theme.border_light))
         .pointer()
-        .onEventCtx(.pointerenter, setHoveredProduct, .{product.id})
+        .onEvent(.pointerenter, setHoveredProduct, .{product.id})
         .onEvent(.pointerleave, clearHoveredProduct)
         .animationEnter("fade-in")
         .children({
@@ -1074,7 +1074,7 @@ fn renderProductDetail() void {
         Stack()
             .width(.percent(100))
             .height(.grow)
-            .padding(.t(56))
+            .padding(.{ .top = 56 })
             // .scroll(.scroll_y())
             .children({
             if (product) |p| {
@@ -1279,7 +1279,7 @@ pub fn renderHome() void {
         Stack()
             .width(.percent(100))
             .height(.grow)
-            .padding(.t(56))
+            .padding(.{ .top = 56 })
             // .scroll(.scroll_y())
             .children({
             // Hero section with product banner

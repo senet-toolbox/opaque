@@ -16,7 +16,7 @@ const Center = Vapor.Center;
 const Icon = Vapor.Icon;
 const List = Vapor.List;
 const ListItem = Vapor.ListItem;
-const CtxButton = Vapor.CtxButton;
+const CtxButton = Vapor.Button;
 const RedirectLink = Vapor.RedirectLink;
 const Button = Vapor.Button;
 const Theme = @import("theme");
@@ -82,7 +82,7 @@ inline fn routes() void {
     }
     Box.style(&.{
         .style_id = "dropdown",
-        .size = .square_px(300),
+        .size = .squarePx(300),
     })({});
 }
 
@@ -152,7 +152,7 @@ fn openDialog() void {
 }
 
 fn navigate(url: []const u8) void {
-    Kit.navigate(url);
+    Vapor.navigate(url);
     menu = !menu;
     Vapor.cycle();
 }
@@ -280,12 +280,12 @@ pub fn render() void {
                 .position = .{ .type = .fixed, .top = .px(80), .left = .px(0) },
                 .size = .w(.percent(100)),
                 .z_index = 999,
-                .visual = .{ .background = Theme.background, .border = .tb(.hex("#E4E4E4")) },
+                .visual = .{ .background = Theme.background, .border = .vertical(1, .hex("#E4E4E4")) },
             })({
                 List.style(&.{
                     .list_style = .none,
                     .direction = .column,
-                    .padding = .tblr(16, 16, 8, 8),
+                    .padding = .xy(8, 16),
                     .child_gap = 16,
                     .size = .w(.percent(100)),
                 })({
@@ -297,7 +297,7 @@ pub fn render() void {
                                 .size = .w(.percent(100)),
                                 .layout = .left_center,
                                 .child_gap = 12,
-                                .padding = .tblr(10, 10, 8, 8),
+                                .padding = .xy(8, 10),
                                 .cursor = .pointer,
                                 .visual = .bg(.hex("#ffffff")),
                             })({
@@ -325,8 +325,7 @@ const Styles = struct {
         // .border_color = if (std.mem.eql(u8, current_path, url.url)) text_color else .transparent,
         .interactive = .{
             .hover = .{
-                .border_color = .palette(.text_color),
-                .border_thickness = .{ .bottom = 1, .top = 0, .left = 0, .right = 0 },
+                .border = .{ .thickness = .{ .bottom = 1, .top = 0, .left = 0, .right = 0 }, .color = .palette(.text_color) },
             },
         },
     };

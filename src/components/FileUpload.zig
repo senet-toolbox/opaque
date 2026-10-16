@@ -34,8 +34,8 @@ pub fn render(file_upload: *FileUpload) void {
         .spacing(8)
         .duration(100)
         .hover(.{
-            .border = .simple(.palette(.tint)),
-            .shadow = .glow(3, .transparentizeHex(.palette(.tint), 0.2)),
+            .border = .thin(.palette(.tint)),
+            .shadow = .glow(3, .transparentize(.palette(.tint), 0.2)),
             // .{
             //         .color = .transparentizeHex(.palette(.tint), 0.2),
             //         .spread = 3,
@@ -43,7 +43,7 @@ pub fn render(file_upload: *FileUpload) void {
         })
         .border(.round(if (is_uploaded) .palette(.tint) else .palette(.border_color_light), .all(12)))
         .shadow(
-            .glow(if (is_uploaded) 3 else 0, if (is_uploaded) .transparentizeHex(.palette(.tint), 0.2) else .transparent),
+            .glow(if (is_uploaded) 3 else 0, if (is_uploaded) .transparentize(.palette(.tint), 0.2) else .transparent),
         )
         // .{
         //         .color = if (is_uploaded) .transparentizeHex(.palette(.tint), 0.2) else .transparent,
@@ -55,11 +55,12 @@ pub fn render(file_upload: *FileUpload) void {
             Vapor.Text("Upload").end();
         }
         Vapor.TextField(.file)
+            .ariaLabel("Upload a file")
             .pos(.tl(.px(0), .px(0), .absolute))
             .width(.percent(100))
             .height(.percent(100))
             .border(.round(.transparent, .all(12)))
-            .onEventCtx(.change, upload, .{file_upload})
+            .onEvent(.change, upload, .{file_upload})
             .font(16, null, .transparent)
             .end();
     });

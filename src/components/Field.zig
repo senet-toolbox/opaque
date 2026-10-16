@@ -763,8 +763,10 @@ fn Container() Vapor.Builder(.pure) {
         .width(.percent(100));
 }
 
-fn ErasedField(field: Field, field_id: []const u8) Vapor.TextFieldBuilder(.pure) {
-    const field_type = getFieldType(field.type);
+/// The input for `field`. `kind` is the field's type as its value gives it:
+/// `field.type` keeps its default (.string) when only a value is passed.
+fn ErasedField(field: Field, kind: FieldType, field_id: []const u8) Vapor.TextFieldBuilder(.pure) {
+    const field_type = getFieldType(kind);
 
     if (!field.focused) {
         return TextField(field_type)
@@ -796,7 +798,7 @@ fn renderLabel(
     z_index: f32,
     text_color: Vapor.Types.Color,
     background: Vapor.Types.Color,
-) Vapor.BuilderClose(.pure) {
+) Vapor.Builder(.pure) {
     return Label(label)
         .background(background)
         .pos(.{ .left = .px(label_left), .type = .absolute, .top = if (trans == -50) .percent(50) else .percent(0) })
@@ -849,7 +851,7 @@ pub fn render(field: Field) void {
     const label_left: f32 = if (is_focused or field.trans_label) 12 + 12 else 12;
 
     const z_index: f32 = if (is_focused) 10 else 0;
-    const text_color: Vapor.Types.Color = if (is_focused) field.tint_color else .transparentizeHex(field.text_color, 0.5);
+    const text_color: Vapor.Types.Color = if (is_focused) field.tint_color else .transparentize(field.text_color, 0.5);
 
     container
         .height(.px(36))
@@ -857,16 +859,16 @@ pub fn render(field: Field) void {
         .pos(.relative)
         .border(.round(if (is_focused) .palette(.tint) else .palette(.border_color_light), .all(12)))
         .background(background)
-        .shadow(.glow(3, if (is_focused) .transparentizeHex(.palette(.tint), 0.2) else .transparent))
+        .shadow(.glow(3, if (is_focused) .transparentize(.palette(.tint), 0.2) else .transparent))
         .children({
         const field_id = Vapor.fmtln("{s}_{s}", .{ @tagName(field_type), stable_id });
-        var label_component: ?Vapor.BuilderClose(.pure) = null;
+        var label_component: ?Vapor.Builder(.pure) = null;
         if (field.label) |label| {
             label_component = renderLabel(label, label_left, trans, scale, z_index, text_color, background);
             label_component.?.fieldName(field_id).end();
         }
 
-        const text_field: Vapor.TextFieldBuilder(.pure) = ErasedField(field, field_id);
+        const text_field: Vapor.TextFieldBuilder(.pure) = ErasedField(field, field_type, field_id);
         // 3. Render the appropriate input type
         switch (field_type) {
             .string => {
@@ -1073,7 +1075,7 @@ pub fn Component(field: *Field, component: ?*const fn (*Field) Vapor.Builder(.pu
     const label_left: f32 = if (is_focused or field.trans_label) 12 + 12 else 12;
 
     const z_index: f32 = if (is_focused) 10 else 0;
-    const text_color: Vapor.Types.Color = if (is_focused) field.tint_color else .transparentizeHex(.palette(.text_color), 0.5);
+    const text_color: Vapor.Types.Color = if (is_focused) field.tint_color else .transparentize(.palette(.text_color), 0.5);
 
     field.is_focused = is_focused;
 
@@ -1093,18 +1095,18 @@ pub fn Component(field: *Field, component: ?*const fn (*Field) Vapor.Builder(.pu
                 .pos(.relative)
                 .border(.round(if (is_focused) .palette(.tint) else .palette(.border_color_light), .all(12)))
                 .background(background)
-                .shadow(.glow(3, if (is_focused) .transparentizeHex(.palette(.tint), 0.2) else .transparent));
+                .shadow(.glow(3, if (is_focused) .transparentize(.palette(.tint), 0.2) else .transparent));
         }
         comp
             .children({
             const field_id = Vapor.fmtln("{s}_{s}", .{ @tagName(field_type), stable_id });
-            var label_component: ?Vapor.BuilderClose(.pure) = null;
+            var label_component: ?Vapor.Builder(.pure) = null;
             if (field.label) |label| {
                 label_component = renderLabel(label, label_left, trans, scale, z_index, text_color, background);
                 label_component.?.fieldName(field_id).end();
             }
 
-            const text_field: Vapor.TextFieldBuilder(.pure) = ErasedField(field.*, field_id);
+            const text_field: Vapor.TextFieldBuilder(.pure) = ErasedField(field.*, field_type, field_id);
 
             // 3. Render the appropriate input type
             switch (field_type) {
@@ -1152,7 +1154,7 @@ pub fn Component(field: *Field, component: ?*const fn (*Field) Vapor.Builder(.pu
                         .onEvent(.focus, handleFocus, .{ stable_id, Callback{ .on_focus = field.on_focus } })
                         .onEvent(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
                         .width(.percent(100))
-                        .onEventCtx(.input, emailCallback, .{Callback{ .value = value, .on_change = field.on_change }})
+                        .onEvent(.input, emailCallback, .{Callback{ .value = value, .on_change = field.on_change }})
                         .border(.none)
                         .val(value.email)
                         .placeholder(if (field.placeholder) |placeholder| placeholder.string else "")
@@ -1162,9 +1164,9 @@ pub fn Component(field: *Field, component: ?*const fn (*Field) Vapor.Builder(.pu
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, Callback{ .on_focus = field.on_focus } })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
+                        .onEvent(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
                         .width(.percent(100))
-                        .onEventCtx(.input, passwordCallback, .{Callback{ .value = value, .on_change = field.on_change }})
+                        .onEvent(.input, passwordCallback, .{Callback{ .value = value, .on_change = field.on_change }})
                         .border(.none)
                         .val(value.password)
                         .placeholder(if (field.placeholder) |placeholder| placeholder.string else "")
@@ -1174,10 +1176,10 @@ pub fn Component(field: *Field, component: ?*const fn (*Field) Vapor.Builder(.pu
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, Callback{ .on_focus = field.on_focus } })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
+                        .onEvent(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
                         .border(.none)
                         .width(.percent(100))
-                        .onEventCtx(.input, numberCallback, .{Callback{ .value = value, .on_change = field.on_change }})
+                        .onEvent(.input, numberCallback, .{Callback{ .value = value, .on_change = field.on_change }})
                         .border(.none)
                         .config(field.config)
                         .placeholder(if (field.placeholder) |placeholder| placeholder.number else 0)
@@ -1188,10 +1190,10 @@ pub fn Component(field: *Field, component: ?*const fn (*Field) Vapor.Builder(.pu
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, Callback{ .on_focus = field.on_focus } })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
+                        .onEvent(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
                         .border(.none)
                         .width(.percent(100))
-                        .onEventCtx(.input, int64Callback, .{Callback{ .value = value, .on_change = field.on_change }})
+                        .onEvent(.input, int64Callback, .{Callback{ .value = value, .on_change = field.on_change }})
                         .border(.none)
                         .config(field.config)
                         .placeholder(if (field.placeholder) |placeholder| placeholder.number else 0)
@@ -1202,10 +1204,10 @@ pub fn Component(field: *Field, component: ?*const fn (*Field) Vapor.Builder(.pu
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, Callback{ .on_focus = field.on_focus } })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
+                        .onEvent(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
                         .border(.none)
                         .width(.percent(100))
-                        .onEventCtx(.input, floatCallback, .{Callback{ .value = value, .on_change = field.on_change }})
+                        .onEvent(.input, floatCallback, .{Callback{ .value = value, .on_change = field.on_change }})
                         .border(.none)
                         .config(field.config)
                         .placeholder(if (field.placeholder) |placeholder| placeholder.float else 0)
@@ -1245,8 +1247,8 @@ pub fn Component(field: *Field, component: ?*const fn (*Field) Vapor.Builder(.pu
                     text_field
                         .pos(.absolute)
                         .onEvent(.focus, handleFocus, .{ stable_id, Callback{ .on_focus = field.on_focus } })
-                        .onEventCtx(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
-                        .onEventCtx(.input, dateCallback, .{Callback{ .value = value, .on_change = field.on_change, .format_str = date_config.format_str }})
+                        .onEvent(.blur, handleBlur, .{ stable_id, Callback{ .on_blur = field.on_blur } })
+                        .onEvent(.input, dateCallback, .{Callback{ .value = value, .on_change = field.on_change, .format_str = date_config.format_str }})
                         .border(.none)
                         .width(.percent(100))
                         .val(date_config.format_str)

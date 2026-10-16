@@ -9,7 +9,7 @@ const Tabs = Opaque.Tabs;
 const Field = Opaque.Field;
 const Button = Opaque.Button;
 const glitch = Opaque.glitch;
-const KeyStone = Vapor.KeyStone;
+const KeyStone = @import("keystone");
 const TrainTicket = @import("TrainTicket.zig");
 const utils = Vapor.utils;
 const Compiler = @import("../../main.zig");
@@ -68,10 +68,10 @@ fn callPayment(payment: *Payment) void {
     });
 }
 
-fn handlePayment(resp: Vapor.Kit.Response) void {
+fn handlePayment(resp: Vapor.Fetch.Result) void {
     switch (resp) {
         .Ok => |data| {
-            Vapor.Kit.setWindowLocation(data.body);
+            Vapor.redirect(data.body);
         },
         .Err => |err| {
             Vapor.println("Failed to fetch payment data: {s}", .{err.message});
@@ -86,7 +86,7 @@ fn onChange(evt: *Vapor.Event) void {
 
 fn Card() Vapor.Builder(.pure) {
     return Stack()
-        .background(.transparentizeHex(.palette(.background), 0.5))
+        .background(.transparentize(.palette(.background), 0.5))
         .border(.round(.palette(.border_color_light), .all(12)))
         .width(.percent(100))
         .padding(.all(16))
@@ -127,14 +127,14 @@ pub fn render(payment: *Payment) void {
             Button(callPayment, .{payment})
                 .size(.hw(.px(36), .percent(100)))
                 .layout(.center)
-                .background(.transparentizeHex(.black, 0.8))
+                .background(.transparentize(.black, 0.8))
                 .border(.round(.black, .all(8)))
                 .pointer()
                 .hover(.{
                     .background = .yellow,
                     .text_color = .black,
                 })
-                .onEventCtx(.pointerenter, onHover, .{Vapor.IconTokens.stripe})
+                .onEvent(.pointerenter, onHover, .{Vapor.IconTokens.stripe})
                 .onLeave(onLeave)
                 .children({
                 const active = hovered != null and std.mem.eql(u8, hovered.?.web.?, Vapor.IconTokens.stripe.web.?);

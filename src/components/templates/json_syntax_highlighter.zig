@@ -6,7 +6,7 @@ const ArrayList = std.array_list.Managed;
 
 const Box = Vapor.Box;
 const Text = Vapor.Text;
-const CtxButton = Vapor.CtxButton;
+const CtxButton = Vapor.Button;
 const Icon = Vapor.Icon;
 const Graphic = Vapor.Graphic;
 const List = Vapor.List;
@@ -924,7 +924,7 @@ pub const JSONHighlighter = struct {
                         Box()
                             .padding(.all(8))
                             .layout(.center)
-                            .background(.transparentizeHex(.black, 0.2))
+                            .background(.transparentize(.black, 0.2))
                             .children({
                             Vapor.Svg(.{ .svg = svg_bug }).style(&.{
                                 .size = .{ .height = .px(16), .width = .px(16) },
@@ -991,10 +991,10 @@ pub const JSONHighlighter = struct {
                     .ariaLabel("copy-json-button")
                     .style(&.{
                         .position = .relative,
-                        .size = .square_px(22),
+                        .size = .squarePx(22),
                         .transition = .{ .duration = 100 },
                         .visual = .{
-                            .border_radius = .all(4),
+                            .border = .{ .radius = .all(4) },
                             .background = .transparent,
                             .text_color = .palette(.disabled),
                             .cursor = .pointer,
@@ -1045,7 +1045,7 @@ pub const JSONHighlighter = struct {
                     .size = .h(.px(22.5)),
                     .visual = .{ .white_space = .pre },
                     .layout = .left_center,
-                    .padding = .l(12),
+                    .padding = .{ .left = 12 },
                     .font_family = "DM Mono, monospace",
                 }).children({
                     for (line_spans) |span| {
@@ -1254,4 +1254,3 @@ test "validate JSON with unmatched braces" {
 
     try std.testing.expect(highlighter.errors.count() > 0);
 }
-

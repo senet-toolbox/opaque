@@ -72,7 +72,7 @@ index: usize = 0,
 drag_offset: f32 = 0,
 is_dragging: bool = false,
 draggable: Draggable,
-track: *Vapor.Binded,
+track: *Vapor.Element,
 container: Vapor.Builder(.pure),
 viewport: Vapor.Builder(.pure),
 track_row: Vapor.Builder(.pure),
@@ -155,11 +155,9 @@ fn goNext(c: *Carousel) void {
     applyTransform(c, true);
 }
 
-const DotCtx = struct { c: *Carousel, idx: usize };
-
-fn goTo(ctx: *DotCtx) void {
-    ctx.c.index = ctx.idx;
-    applyTransform(ctx.c, true);
+fn goTo(c: *Carousel, index: usize) void {
+    c.index = index;
+    applyTransform(c, true);
 }
 
 // ============================================================================
@@ -177,7 +175,7 @@ pub fn render(options: Options) *Carousel {
     // Look up or create persistent state
     const c = carousels.get(stable_id) orelse blk: {
         const new_c = Vapor.arena(.persist).create(Carousel) catch unreachable;
-        const tb = Vapor.arena(.persist).create(Vapor.Binded) catch unreachable;
+        const tb = Vapor.arena(.persist).create(Vapor.Element) catch unreachable;
         tb.* = .{};
         new_c.* = .{
             .options = options,
@@ -223,7 +221,7 @@ pub fn render(options: Options) *Carousel {
         .height(.px(options.viewport_height))
         .scroll(.none())
         .pos(.relative)
-        // .createDraggable(&c.draggable)
+        .createDraggable(&c.draggable)
         .inlineStyle("touch-action: pan-y; cursor: grab; user-select: none; overflow: hidden;", .{});
 
     // Open track inside viewport — this is what the user's slides land in
@@ -263,6 +261,9 @@ pub fn end(self: *Carousel) void {
 // ============================================================================
 
 fn renderArrows(c: *Carousel) void {
+    // Without looping, the arrow that would go past an end does nothing.
+    const at_first = !c.options.loop and c.index == 0;
+    const at_last = !c.options.loop and c.index + 1 >= c.options.count;
     Row()
         .pos(.absolute)
         .inlineStyle(
@@ -271,22 +272,26 @@ fn renderArrows(c: *Carousel) void {
         )
         .children({
         Button(goPrev, .{c})
-            .ariaLabel("previous slide")
+            .a11y(Vapor.Accessibility.init().setDisabled(at_first))
+            .ariaLabel("Previous slide")
+            .opacity(if (at_first) 0.3 else 1)
             .inlineStyle("pointer-events: auto;", .{})
             .width(.px(40)).height(.px(40))
             .layout(.center)
-            .background(.transparentizeHex(.black, 0.4))
+            .background(.transparentize(.black, 0.4))
             .border(.round(.transparent, .all(99)))
             .pointer()
             .children({
             Text("‹").font(24, 700, .white).fontFamily("IBM Plex Sans,monospace").end();
         });
         Button(goNext, .{c})
-            .ariaLabel("next slide")
+            .a11y(Vapor.Accessibility.init().setDisabled(at_last))
+            .ariaLabel("Next slide")
+            .opacity(if (at_last) 0.3 else 1)
             .inlineStyle("pointer-events: auto;", .{})
             .width(.px(40)).height(.px(40))
             .layout(.center)
-            .background(.transparentizeHex(.black, 0.4))
+            .background(.transparentize(.black, 0.4))
             .border(.round(.transparent, .all(99)))
             .pointer()
             .children({
@@ -298,11 +303,11 @@ fn renderArrows(c: *Carousel) void {
 fn renderDots(c: *Carousel) void {
     Row().width(.percent(100)).layout(.center).spacing(8).children({
         for (0..c.options.count) |i| {
-            const ctx = Vapor.arena(.frame).create(DotCtx) catch unreachable;
-            ctx.* = .{ .c = c, .idx = i };
             const active = (i == c.index);
-            Button(goTo, .{ctx})
-                .ariaLabel("dot")
+            Button(goTo, .{ c, i })
+                // The dot for the slide on show reads as pressed.
+                .a11y(Vapor.Accessibility.init().setPressed(if (active) .true_val else .false_val))
+                .ariaLabel(Vapor.fmtln("Go to slide {d}", .{i + 1}))
                 .width(.px(if (active) 24 else 8))
                 .height(.px(8))
                 .background(if (active) .palette(.tint) else .palette(.border_color_light))
@@ -312,4 +317,3 @@ fn renderDots(c: *Carousel) void {
         }
     });
 }
-

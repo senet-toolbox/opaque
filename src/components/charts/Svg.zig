@@ -135,7 +135,7 @@ pub const Svg = struct {
         fill: ?Vapor.Types.Color = null,
         stroke: ?Vapor.Types.Color = null,
         rx: ?f64 = null,
-        border: ?Vapor.Types.BorderGrouped = null,
+        border: ?Vapor.Types.Border = null,
         stroke_width: ?f32 = null,
         opacity: ?f64 = null,
     };

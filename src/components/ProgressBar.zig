@@ -104,7 +104,16 @@ pub const ProgressBar = struct {
         const progress_width: f64 = @as(f64, @floatFromInt(width)) * self.progress;
 
         self.platform.browser.setAttribute(id_suffix, "width", Vapor.fmtln("{d:.2}", .{progress_width}));
-        Vapor.lib.mutateById(text_suffix, "innerHTML", Vapor.fmtln("{d:.0}%", .{self.progress * 100}));
+        // The label is only drawn when it is shown.
+        if (self.config.show_label and self.config.label_format != .none) {
+            Vapor.lib.mutateById(text_suffix, "innerHTML", Vapor.fmtln("{d:.0}%", .{self.progress * 100}));
+        }
+        // No render follows, so the value screen readers see moves here too.
+        self.platform.browser.setAttribute(self.elementId(), "aria-valuenow", Vapor.fmtln("{d:.0}", .{self.progress * 100}));
+    }
+
+    fn elementId(self: *const ProgressBar) []const u8 {
+        return Vapor.fmtln("bar-{x}", .{@intFromPtr(self)});
     }
 
     pub fn rebuild(self: *ProgressBar) void {
@@ -296,6 +305,8 @@ pub const ProgressBar = struct {
         };
 
         Box()
+            .id(self.elementId())
+            .a11y(Vapor.Accessibility.progressBar(@floatCast(self.progress * 100), 100).setLabel("Progress"))
             .width(.px(@floatFromInt(render_width)))
             .height(.px(@floatFromInt(render_height)))
             .onMount(rebuild, .{self})

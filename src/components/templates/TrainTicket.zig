@@ -68,14 +68,14 @@ pub fn render(details: *const Details) void {
                 .width(.percent(100))
                 .height(.percent(100))
                 .direction(.column)
-                .padding(.tb(8, 8))
+                .padding(.vertical(8))
                 .zIndex(100)
                 .children({
                 Box()
                     .width(.percent(60))
                     .background(.black)
                     .layout(.right_center)
-                    .padding(.lr(16, 16))
+                    .padding(.horizontal(16))
                     .children({
                     Text("ACORN TICKET").font(18, 900, .white).end();
                 });
@@ -85,7 +85,7 @@ pub fn render(details: *const Details) void {
                     .layout(.x_between)
                     .children({
                     Box()
-                        .padding(.tblr(8, 8, 16, 16))
+                        .padding(.xy(16, 8))
                         .width(.percent(100))
                         .direction(.column)
                         .spacing(8)
@@ -122,7 +122,7 @@ pub fn render(details: *const Details) void {
                         .width(.percent(60))
                         .background(.red)
                         .layout(.right_center)
-                        .padding(.lr(16, 16))
+                        .padding(.horizontal(16))
                         .children({
                         TextFmt("TICKET COUNT {d}", .{user_count}).font(18, 900, .white).end();
                     });
@@ -159,7 +159,7 @@ pub fn render(details: *const Details) void {
             .background(.yellow)
             .width(.percent(100))
             .height(.percent(20))
-            .padding(.t(16))
+            .padding(.{ .top = 16 })
             .pos(.relative)
             .children({
             Box()
@@ -175,7 +175,7 @@ pub fn render(details: *const Details) void {
                     .height(.px(38))
                     .background(.white)
                     .layout(.center)
-                .padding(.all(4))
+                    .padding(.all(4))
                     .children({
                     Vapor.Svg(.{ .svg = @embedFile("barcode.svg"), .override = true })
                         .width(.percent(100))
@@ -212,4 +212,3 @@ pub fn render(details: *const Details) void {
         });
     });
 }
-

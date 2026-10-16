@@ -2,7 +2,7 @@ const std = @import("std");
 const Vapor = @import("vapor");
 const Box = Vapor.Box;
 const Text = Vapor.Text;
-const Svg = @import("svg.zig").Svg;
+const Svg = @import("Svg.zig").Svg;
 const path_util = @import("util/path.zig");
 const color_util = @import("util/color.zig");
 const ArrayList = std.array_list.Managed;
@@ -47,7 +47,7 @@ pub const StackTrace = struct {
     config: Config,
     root: ?*const StackNode = null,
     current_svg: ?[]const u8 = null,
-    container: Vapor.Binded = .{},
+    container: Vapor.Element = .{},
     tooltip: ?Tooltip = null,
     bounds: Bounds = .{},
 
@@ -227,7 +227,7 @@ pub const StackTrace = struct {
     const Tooltip = struct {
         top: f32 = 0,
         left: f32 = 0,
-        binded: Vapor.Binded = .{},
+        binded: Vapor.Element = .{},
         hide: bool = true,
         name: []const u8 = "",
         file: []const u8 = "",
@@ -1242,18 +1242,18 @@ pub const StackTrace = struct {
                 .pos(.relative)
                 .width(.percent(100))
                 .height(.percent(100))
-                .onEventCtx(.pointerenter, showTooltip, .{self})
-                .onEventCtx(.pointerleave, hideTooltip, .{self})
-                .onEventCtx(.pointermove, updateTooltip, .{self})
-                .onEventCtx(.click, handleClick, .{self})
-                .onEventCtx(.dblclick, handleDblClick, .{self})
+                .onEvent(.pointerenter, showTooltip, .{self})
+                .onEvent(.pointerleave, hideTooltip, .{self})
+                .onEvent(.pointermove, updateTooltip, .{self})
+                .onEvent(.click, handleClick, .{self})
+                .onEvent(.dblclick, handleDblClick, .{self})
                 .children({
                 if (self.tooltip) |*tooltip| {
                     Box()
                         .ref(&tooltip.binded)
                         .pos(.absolute)
                         .width(.px(240))
-                        .padding(.tblr(8, 8, 10, 10))
+                        .padding(.xy(10, 8))
                         .layout(.top_left)
                         .direction(.column)
                         .background(.hex("#1e1e2e"))

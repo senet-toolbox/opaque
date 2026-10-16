@@ -58,9 +58,9 @@ new_cursor_pos: usize = 0,
 token_lines: ?[][]Token = null,
 
 // Bindings
-editor_container: Vapor.Binded = .{},
-text_area: Vapor.Binded = .{},
-highlighter_layer: Vapor.Binded = .{},
+editor_container: Vapor.Element = .{},
+text_area: Vapor.Element = .{},
+highlighter_layer: Vapor.Element = .{},
 
 // Key state
 holding_meta: bool = false,
@@ -433,7 +433,7 @@ fn insertPair(self: *JsonEditor, open: u8, close: u8) void {
         // For quotes: if next char is same quote, just skip over it
         if (open == close and cur < self.text.len and self.text[cur] == close) {
             self.new_cursor_pos = cur + 1;
-            Vapor.onEndCtx(setCursor, .{self});
+            Vapor.onLayout(setCursor, .{self});
             return;
         }
         const pair = std.fmt.allocPrint(Vapor.arena(.frame), "{c}{c}", .{ open, close }) catch unreachable;
@@ -442,14 +442,14 @@ fn insertPair(self: *JsonEditor, open: u8, close: u8) void {
         self.new_cursor_pos = cur + 1;
     }
     self.tokenize();
-    Vapor.onEndCtx(setCursor, .{self});
+    Vapor.onLayout(setCursor, .{self});
 }
 
 fn skipClosing(self: *JsonEditor, close: u8) bool {
     const cur = self.text_area.cursorPosition();
     if (cur < self.text.len and self.text[cur] == close) {
         self.new_cursor_pos = cur + 1;
-        Vapor.onEndCtx(setCursor, .{self});
+        Vapor.onLayout(setCursor, .{self});
         return true;
     }
     return false;
@@ -466,7 +466,7 @@ fn deletePair(self: *JsonEditor) bool {
             self.setText(total);
             self.new_cursor_pos = cur - 1;
             self.tokenize();
-            Vapor.onEndCtx(setCursor, .{self});
+            Vapor.onLayout(setCursor, .{self});
             return true;
         }
     }
@@ -516,7 +516,7 @@ fn handleEnter(self: *JsonEditor) void {
     }
 
     self.tokenize();
-    Vapor.onEndCtx(setCursor, .{self});
+    Vapor.onLayout(setCursor, .{self});
 }
 
 fn handleTab(self: *JsonEditor, shift: bool) void {
@@ -539,7 +539,7 @@ fn handleTab(self: *JsonEditor, shift: bool) void {
         self.new_cursor_pos = cur + 2;
     }
     self.tokenize();
-    Vapor.onEndCtx(setCursor, .{self});
+    Vapor.onLayout(setCursor, .{self});
 }
 
 // ============================================================================
@@ -594,7 +594,7 @@ pub fn render(self: *JsonEditor) void {
                 .height(.percent(100))
                 .width(.percent(100))
                 .padding(.horizontal(12))
-                .scroll(.scroll_y())
+                .scroll(.scrollY())
                 .pos(.tl(.percent(0), .percent(0), .absolute))
                 .children({
                 self.renderHighlighted();
@@ -614,22 +614,22 @@ pub fn render(self: *JsonEditor) void {
                     .val(&self.text)
                     .placeholder(self.text)
                     .width(.percent(100))
-                    .outline(.none)
+                    .outline(.none, null)
                     .border(.none)
                     .resize(.none)
-                    .border(.simple(.transparent))
+                    .border(.thin(.transparent))
                     .height(.percent(100))
-                    .whitespace(.pre)
-                    .padding(.tblr(11, 0, 47, 0))
+                    .whiteSpace(.pre)
+                    .padding(.{ .top = 11, .left = 47 })
                     .fontFamily("DM Mono, monospace")
                     .caret(.{ .type = .block, .color = .white })
                     .textDecoration(.none)
                     .font(15, 400, .transparent)
-                    .onEventCtx(.scroll, onScroll, .{self})
-                    .onEventCtx(.input, onChange, .{self})
-                    .onEventCtx(.keydown, onKeyDown, .{self})
-                    .onEventCtx(.keyup, onKeyUp, .{self})
-                    .onEventCtx(.blur, onBlur, .{self})
+                    .onEvent(.scroll, onScroll, .{self})
+                    .onEvent(.input, onChange, .{self})
+                    .onEvent(.keydown, onKeyDown, .{self})
+                    .onEvent(.keyup, onKeyUp, .{self})
+                    .onEvent(.blur, onBlur, .{self})
                     .end();
             });
         });
@@ -661,7 +661,7 @@ fn renderHighlighted(self: *JsonEditor) void {
                     .size = .h(.px(22.5)),
                     .visual = .{ .white_space = .pre },
                     .layout = .left_center,
-                    .padding = .left(12),
+                    .padding = .{ .left = 12 },
                     .font_family = "DM Mono, monospace",
                 }).children({
                     for (tokens) |tok| {
@@ -676,4 +676,3 @@ fn renderHighlighted(self: *JsonEditor) void {
         }
     });
 }
-

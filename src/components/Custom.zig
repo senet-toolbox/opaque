@@ -122,21 +122,21 @@ fn toggleIcon() void {
 pub fn code_snippet_single(text: []const u8) void {
     CtxButton(copy, .{text})
         .style(&.{
-        .visual = .{
-            .border = .simple(.palette(.border_color_light)),
-            .text_color = .palette(.text_color),
-            .cursor = .pointer,
-            .background = .palette(.background),
-            .shadow = .card(.palette(.tint)),
-        },
-        .padding = .all(8),
-        .child_gap = 16,
-        .layout = .flex,
-        .interactive = .{
-            .hover = .{ .text_color = .palette(.tint), .border = .simple(.palette(.tint)) },
-        },
-        .position = .relative,
-    }).children({
+            .visual = .{
+                .border = .thin(.palette(.border_color_light)),
+                .text_color = .palette(.text_color),
+                .cursor = .pointer,
+                .background = .palette(.background),
+                .shadow = .card(.palette(.tint)),
+            },
+            .padding = .all(8),
+            .child_gap = 16,
+            .layout = .flex,
+            .interactive = .{
+                .hover = .{ .text_color = .palette(.tint), .border = .thin(.palette(.tint)) },
+            },
+            .position = .relative,
+        }).children({
         Text(text).font(16, null, null)
             .ellipsis(.dot)
             .fontFamily("Azeret Mono, monospace")
@@ -145,10 +145,10 @@ pub fn code_snippet_single(text: []const u8) void {
             .end();
         Box().style(&.{
             // .position = .{ .type = .absolute, .right = .px(8), .top = .px(8) },
-            .size = .square_px(22),
+            .size = .squarePx(22),
             .transition = .{ .duration = 100 },
             .visual = .{
-                .border_radius = .all(4),
+                .border = .{ .radius = .all(4) },
                 .background = .transparent,
                 .cursor = .pointer,
             },
@@ -165,6 +165,5 @@ pub fn code_snippet_single(text: []const u8) void {
                 }).end();
             }
         });
- 
     });
 }

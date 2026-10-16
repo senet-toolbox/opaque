@@ -267,9 +267,9 @@ fn PricingCard(plan: *const PricingPlan) void {
         .spacing(20)
         .layout(.top_left)
         .background(if (is_highlighted)
-            .transparentizeHex(.palette(.tint), 0.6)
+            .transparentize(.palette(.tint), 0.6)
         else
-            .transparentizeHex(.palette(.background), 0.5))
+            .transparentize(.palette(.background), 0.5))
         .border(.sharp(
             .all(1),
             if (is_highlighted) .palette(.tint) else .palette(.border_color_light),
@@ -279,10 +279,10 @@ fn PricingCard(plan: *const PricingPlan) void {
             .transform = .translate(0, -8, .px),
             .border = .round(if (is_highlighted) .palette(.tint) else .palette(.border_color_light), .all(16)),
             .new_shadow = Vapor.Types.NewShadow.init()
-                .inset(0, -2, .transparentizeHex(.black, 0.3))
-                .drop(0, 1, 3, .transparentizeHex(.black, 0.1)),
+                .inset(0, -2, .transparentize(.black, 0.3))
+                .drop(0, 1, 3, .transparentize(.black, 0.1)),
         })
-        .onEventCtx(.pointerenter, onHoverTier, .{plan.tier})
+        .onEvent(.pointerenter, onHoverTier, .{plan.tier})
         .onLeave(onLeaveTier)
         .children({
         // Badge for highlighted plan
@@ -292,7 +292,7 @@ fn PricingCard(plan: *const PricingPlan) void {
                 .layout(.center)
                 .children({
                 Box()
-                    .padding(.tblr(6, 6, 12, 12))
+                    .padding(.xy(12, 6))
                     .background(.palette(.tint))
                     .border(.round(.palette(.tint), .all(99)))
                     .children({
@@ -365,7 +365,7 @@ fn PricingCard(plan: *const PricingPlan) void {
         // CTA Button
         Box()
             .width(.percent(100))
-            .padding(.tb(16, 0))
+            .padding(.{ .top = 16 })
             .layout(.center)
             .children({
             Button(onSelectPlan, .{plan.tier})

@@ -7,7 +7,7 @@
 // Usage:
 //   const Sortable = @import("Sortable.zig");
 //
-//   var drag_ctx: Sortable.DragContext = .{};
+//   var drag_ctx: Sortable.DragContext(u32) = .{};
 //   var backlog = Sortable.Collection(Card, .{ .id_field = "id" });
 //
 // Or if added to Opaque:
@@ -27,8 +27,10 @@ pub const TransferEvent = SortableCollection.TransferEvent;
 
 pub const ItemState = @import("DragContext.zig").ItemState;
 pub const Direction = @import("DragContext.zig").Direction;
-pub const DragOverlayState = @import("DragContext.zig").DragOverlayState;
-pub const Rect = DragContext.Rect;
+pub fn DragOverlayState(comptime IdType: type) type {
+    return DragContext(IdType).DragOverlayState;
+}
+pub const Rect = @import("DragContext.zig").Rect;
 
 // ============================================================================
 // Global Initialization

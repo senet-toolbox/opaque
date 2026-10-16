@@ -123,7 +123,7 @@ pub fn CollectionConfig(comptime T: type, comptime IdType: type) type {
 fn ItemSlot(comptime T: type) type {
     _ = T;
     return struct {
-        binded: Vapor.Binded = .{},
+        binded: Vapor.Element = .{},
     };
 }
 
@@ -184,7 +184,7 @@ pub fn Collection(
         slots: Vapor.ArrayArena(ItemSlot(T)) = undefined,
         drag_ctx: ?*Ctx = null,
         handle: Handle = .{},
-        container_binded: Vapor.Binded = .{},
+        container_binded: Vapor.Element = .{},
 
         /// The typed identifier for this collection. Set at init time and
         /// used as the key in DragContext, hover state, and TransferEvent.
@@ -439,11 +439,11 @@ pub fn Collection(
 
                     fn destroy(ptr: *anyopaque) void {
                         const self: *@This() = @ptrCast(@alignCast(ptr));
-                        Vapor.persist.allocator().destroy(self);
+                        Vapor.persist.arena().destroy(self);
                     }
                 };
 
-                const closure = try Vapor.persist.allocator().create(Closure);
+                const closure = try Vapor.persist.arena().create(Closure);
                 closure.* = .{ .arguments = args };
 
                 return .{
@@ -501,7 +501,7 @@ pub fn Collection(
                     }
                 };
 
-                const closure = try Vapor.persist.allocator().create(Closure);
+                const closure = try Vapor.persist.arena().create(Closure);
                 closure.* = .{ .arguments = args };
 
                 return .{
@@ -1344,12 +1344,7 @@ pub fn Collection(
                                             .zIndex(9999)
                                             .cursor(.grabbing)
                                             .opacity(0.9)
-                                            .shadow(.{
-                                                .color = .transparentize(.black, 0.15),
-                                                .blur = 16,
-                                                .top = 4,
-                                                .spread = 2,
-                                            })
+                                            .shadow(Vapor.Types.Shadow.init().dropSpread(0, 4, 16, 2, .transparentize(.black, 0.15)))
                                             .border(.round(.palette(.tint), .all(8)))
                                             .background(.palette(.background))
                                             .children({

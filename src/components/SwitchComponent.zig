@@ -24,8 +24,8 @@ fn Circle(switch_options: *SwitchOptions) void {
     Box()
         .width(.px(20))
         .height(.px(20))
-        .layer(.dot(0.5, 6, .transparentizeHex(.black, 0.3)))
-        .shadow(.insetGlow(0, 2, 2, .transparentizeHex(.black, 0.1)))
+        .layer(.dot(0.5, 6, .transparentize(.black, 0.3)))
+        .shadow(Vapor.Types.Shadow.init().dropSpread(0, 2, 2, 1, .transparentize(.black, 0.1)))
         .border(.{
             .thickness = .none,
             .radius = .all(border_radius),

@@ -39,19 +39,14 @@ pub var stack_position: StackPosition = .top_right;
 pub var toasts: Vapor.Array(Toast) = undefined;
 pub var border_thickness: u8 = 1;
 pub var border_radius: Vapor.Types.BorderRadius = .all(16);
-pub var border_color: Vapor.Types.BorderGrouped = .white;
-pub var background: Vapor.Types.Color = .transparentizeHex(.white, 0.2);
-pub var shadow: Vapor.Types.Shadow = .{
-    .blur = 8,
-    .color = .transparentizeHex(.black, 0.15),
-    .top = 2,
-    .spread = 0,
-};
+pub var border_color: Vapor.Types.Color = .white;
+pub var background: Vapor.Types.Color = .transparentize(.white, 0.2);
+pub var shadow: Vapor.Types.Shadow = Vapor.Types.Shadow.init().dropSpread(0, 2, 8, 0, .transparentize(.black, 0.15));
 
-pub var success_background: Vapor.Types.Color = .transparentizeHex(.white, 0.2);
-pub var err_background: Vapor.Types.Color = .transparentizeHex(.white, 0.2);
-pub var warning_background: Vapor.Types.Color = .transparentizeHex(.white, 0.2);
-pub var info_background: Vapor.Types.Color = .transparentizeHex(.white, 0.2);
+pub var success_background: Vapor.Types.Color = .transparentize(.white, 0.2);
+pub var err_background: Vapor.Types.Color = .transparentize(.white, 0.2);
+pub var warning_background: Vapor.Types.Color = .transparentize(.white, 0.2);
+pub var info_background: Vapor.Types.Color = .transparentize(.white, 0.2);
 
 pub var success_text_color: Vapor.Types.Color = .black;
 pub var err_text_color: Vapor.Types.Color = .black;
@@ -160,19 +155,42 @@ fn showToast(toast: *Toast) void {
     startToastTimeout(toast);
 }
 
+/// Each toast's own timer, named by its id, removes that toast and no other.
+fn timerName(id: usize) []const u8 {
+    return Vapor.fmtln("opaque-toast-timeout-{d}", .{id});
+}
+
 fn startToastTimeout(toast: *Toast) void {
-    const id = Vapor.fmtln("remove_oldest_toast-{d}", .{toast.id});
-    Vapor.lib.timeout(id, 5000, removeOldestToast, .{{}});
+    if (!toast.auto_close) return;
+    Vapor.lib.timeout(timerName(toast.id), toast.duration, expire, .{toast.id});
 }
 
 fn cancelToast(toast: *Toast) void {
-    const id = Vapor.fmtln("remove_oldest_toast-{d}", .{toast.id});
-    Vapor.lib.cancelTimeout(id);
+    Vapor.lib.cancelTimeout(timerName(toast.id));
 }
 
 fn clearTimeout(toast: *Toast) void {
-    const id = Vapor.fmtln("remove_oldest_toast-{d}", .{toast.id});
-    Vapor.lib.cancelTimeout(id);
+    cancelToast(toast);
+}
+
+fn indexOf(id: usize) ?usize {
+    for (toasts.items, 0..) |t, i| {
+        if (t.id == id) return i;
+    }
+    return null;
+}
+
+fn expire(id: usize) void {
+    const i = indexOf(id) orelse return;
+    _ = toasts.orderedRemove(i);
+    movePreviousDown();
+}
+
+/// Closes the toast with `id` now. The close button passes the id, not a
+/// pointer: the toast array shifts as toasts come and go.
+fn dismiss(id: usize) void {
+    const i = indexOf(id) orelse return;
+    toasts.items[i].hide();
 }
 
 pub fn success(options: Options) void {
@@ -232,35 +250,12 @@ pub fn show(toast: *Toast) void {
 
 pub fn hide(toast: *Toast) void {
     toast.is_visible = false;
+    cancelToast(toast);
     if (toast.on_close) |callback| {
         callback(toast);
     }
-    for (toasts.items, 0..) |*t, i| {
-        if (t.id == toast.id) {
-            _ = toasts.orderedRemove(i);
-            break; // <-- stop iterating after removal
-        }
-    }
+    if (indexOf(toast.id)) |i| _ = toasts.orderedRemove(i);
     showAllToasts();
-}
-
-fn movePreviousUp() void {
-    if (toasts.items.len == 0) return;
-    const last = toasts.items.len - 1;
-    var i: usize = 0;
-    while (i < toasts.items.len) : (i += 1) {
-        if (toasts.items[i].is_visible) {
-            toasts.items[i].offset = @as(f32, @floatFromInt(last - i)) * 14.0;
-            Vapor.print("Id {d}", .{toasts.items[i].id});
-        }
-        if (i == last) break;
-    }
-}
-
-fn removeOldestToast(_: void) void {
-    if (toasts.items.len == 0) return;
-    _ = toasts.orderedRemove(0);
-    movePreviousDown();
 }
 
 fn getTypeColor(toast_type: ToastType) Vapor.Types.Color {
@@ -272,7 +267,7 @@ fn getTypeColor(toast_type: ToastType) Vapor.Types.Color {
     };
 }
 
-fn getTypeIcon(toast_type: ToastType) Vapor.IconType {
+fn getTypeIcon(toast_type: ToastType) Vapor.IconTokens {
     return switch (toast_type) {
         .success => IconTokens.check2_all,
         .err => IconTokens.exclamation_circle,
@@ -432,10 +427,12 @@ fn renderToast(toast: *Toast, index: usize, position: StackPosition) void {
 
     Box()
         .id(Vapor.fmtln("opaque-toast-{d}", .{toast.id}))
+        // Errors interrupt a screen reader; the rest wait their turn.
+        .a11y(if (toast.toast_type == .err) .alert() else .statusRegion())
         .shadow(
             Vapor.Types.NewShadow.init()
-                .inset(0, -2, .transparentizeHex(.black, 0.1))
-                .drop(0, 1, 3, .transparentizeHex(.black, 0.2)),
+                .inset(0, -2, .transparentize(.black, 0.1))
+                .drop(0, 1, 3, .transparentize(.black, 0.2)),
         )
         .border(.solid(.all(border_thickness), getBorderColor(toast.toast_type), border_radius))
         // .border(.simple(.black))
@@ -485,19 +482,20 @@ fn renderToast(toast: *Toast, index: usize, position: StackPosition) void {
         });
 
         // 3. Close Button
-        Button(hide, .{toast})
+        Button(dismiss, .{toast.id})
+            .ariaLabel("Dismiss notification")
             .class("toast-close")
             .cursor(.pointer)
             .padding(.all(4))
             .duration(100)
             .hover(.{
-                .text_color = .transparentizeHex(getTextColor(toast.toast_type), 0.5),
+                .text_color = .transparentize(getTextColor(toast.toast_type), 0.5),
             })
             .children({
             Vapor.Svg(.{ .svg = close_icon, .override = true })
                 .fill(getTextColor(toast.toast_type))
                 .hover(.{
-                    .fill = .transparentizeHex(getTextColor(toast.toast_type), 0.5),
+                    .fill = .transparentize(getTextColor(toast.toast_type), 0.5),
                 })
                 .end();
         });

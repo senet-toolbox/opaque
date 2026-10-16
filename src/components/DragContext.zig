@@ -535,7 +535,7 @@ pub fn DragContext(comptime IdType: type) type {
                     return @call(.auto, callback, closure.arguments ++ .{typed});
                 }
             };
-            const closure = Vapor.persist.allocator().create(Closure) catch return;
+            const closure = Vapor.persist.arena().create(Closure) catch return;
             closure.* = .{ .arguments = args };
             self.shared_filter = .{
                 .ctx = @ptrCast(closure),

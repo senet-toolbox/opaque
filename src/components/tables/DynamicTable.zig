@@ -103,7 +103,7 @@ pub const TableStyle = struct {
     text_color_muted: Vapor.Types.Color = .palette(.text_muted),
     icon_color: Vapor.Types.Color = .black,
     border_color: Vapor.Types.Color = .transparentize(.black, 0.2),
-    tint: Vapor.Types.Color = .transparentizeHex(.palette(.tint), 0.8),
+    tint: Vapor.Types.Color = .transparentize(.palette(.tint), 0.8),
     checkbox_icon_color: Vapor.Types.Color = .white,
 
     // Hover / tapped cell highlight colors
@@ -116,7 +116,7 @@ pub const TableStyle = struct {
     edit_popup_border_color: Vapor.Types.Color = .transparentize(.black, 0.2),
 
     // ── Borders ──────────────────────────────────────────────────────────
-    border: Vapor.Types.BorderGrouped = .round(.transparentize(.black, 0.2), .all(6)),
+    border: Vapor.Types.Border = .round(.transparentize(.black, 0.2), .all(6)),
     border_radius: u8 = 6,
     /// Style of inter-cell dividers ('dashed', 'solid', etc).
     cell_divider_style: Vapor.Types.BorderStyle = .dashed,
@@ -461,7 +461,7 @@ pub fn DynamicTable(
         table_id: []const u8 = "data-table",
         total_width_percent: f32 = 100,
         row_background: ?Vapor.Types.Color = null,
-        row_border: ?Vapor.Types.BorderGrouped = null,
+        row_border: ?Vapor.Types.Border = null,
         row_spacing: ?u8 = null,
         x: f32 = 0,
         y: f32 = 0,
@@ -470,8 +470,8 @@ pub fn DynamicTable(
         current_value: *Value = undefined,
         current_value_str: []const u8 = "",
         editMode: EditMode = .None,
-        text_area: Vapor.Binded = .{ .element_type = .TextArea },
-        container: Vapor.Binded = .{},
+        text_area: Vapor.Element = .{ .element_type = .TextArea },
+        container: Vapor.Element = .{},
         clickable: bool = true,
         on_item_click: ?*const fn (*Value) void = null,
         on_row_click: ?*const fn (*DynamicRow) void = null,
@@ -488,8 +488,8 @@ pub fn DynamicTable(
         arena: std.heap.ArenaAllocator = undefined,
         actions: []const Action(DynamicRow) = config.actions orelse &.{},
 
-        binded_cols: []Vapor.Binded = &.{},
-        search_box: Vapor.Binded = .{},
+        binded_cols: []Vapor.Element = &.{},
+        search_box: Vapor.Element = .{},
         show_search: bool = false,
         clicked_index: usize = 0,
         active_filters: []?[]const u8 = &.{},
@@ -518,7 +518,7 @@ pub fn DynamicTable(
             table.arena_allocator = table.arena.allocator();
 
             table.active_filters = table.arena_allocator.alloc(?[]const u8, table.table_columns.len) catch |err| blk: {
-                Vapor.printErr("Failed to allocate active_filters: {any}", .{err});
+                Vapor.print(.err, "Failed to allocate active_filters: {any}", .{err});
                 break :blk &.{};
             };
             @memset(table.active_filters, null);
@@ -574,7 +574,7 @@ pub fn DynamicTable(
             table.enum_filters = std.StringHashMap(void).init(table.arena_allocator);
 
             table.active_filters = table.arena_allocator.alloc(?[]const u8, table.table_columns.len) catch |err| blk: {
-                Vapor.printErr("Failed to allocate active_filters: {any}", .{err});
+                Vapor.print(.err, "Failed to allocate active_filters: {any}", .{err});
                 break :blk &.{};
             };
             @memset(table.active_filters, null);
@@ -603,7 +603,7 @@ pub fn DynamicTable(
             const delete_index = table.indexOfId(id) orelse return false;
 
             var new_data = table.arena_allocator.alloc(DynamicRow, table.data.len - 1) catch |err| {
-                Vapor.printErr("Failed to allocate table data after delete: {any}", .{err});
+                Vapor.print(.err, "Failed to allocate table data after delete: {any}", .{err});
                 return false;
             };
 
@@ -627,9 +627,9 @@ pub fn DynamicTable(
         // Internal init helpers (deduped from init / regenerate)
         // =================================================================
 
-        fn allocBindedCols(table: *Self) []Vapor.Binded {
-            return table.arena_allocator.alloc(Vapor.Binded, table.table_columns.len) catch |err| blk: {
-                Vapor.printErr("Failed to allocate binded cols: {any}", .{err});
+        fn allocBindedCols(table: *Self) []Vapor.Element {
+            return table.arena_allocator.alloc(Vapor.Element, table.table_columns.len) catch |err| blk: {
+                Vapor.print(.err, "Failed to allocate binded cols: {any}", .{err});
                 break :blk &.{};
             };
         }
@@ -1093,7 +1093,7 @@ pub fn DynamicTable(
                 const b = if (!is_hovered) corner.normal_border else corner.hover_border;
                 const color: Vapor.Types.Color = if (!is_hovered) .transparent else table.style.corner_bracket_color;
                 const offset: Vapor.Types.Pos = if (!is_hovered) .px(-6) else .px(-2);
-                const border_val: Vapor.Types.BorderGrouped = .sharp(.tblr(b[0], b[1], b[2], b[3]), color);
+                const border_val: Vapor.Types.Border = .sharp(.{ .top = b[0], .bottom = b[1], .left = b[2], .right = b[3] }, color);
                 const pos = switch (corner.pos_fn) {
                     .tl => Vapor.Types.Position.tl(offset, offset, .absolute),
                     .tr => Vapor.Types.Position.tr(offset, offset, .absolute),
@@ -1181,7 +1181,7 @@ pub fn DynamicTable(
                     .layout(.left_center)
                     .onEvent(.pointerenter, hoverBtn, .{ table, id })
                     .onEvent(.pointerleave, leaveBtn, .{table})
-                    .border(.{ .thickness = .left(table.style.cell_divider_thickness), .color = table.style.border_color })
+                    .border(.{ .thickness = .{ .left = table.style.cell_divider_thickness }, .color = table.style.border_color })
                     .borderStyle(table.style.cell_divider_style)
                     .duration(table.style.hover_duration)
                     .height(.px(table.style.row_height))
@@ -1252,13 +1252,13 @@ pub fn DynamicTable(
             const is_selected = table.includes(id_value.toString());
 
             Box()
-                .border(.{ .thickness = .tblr(0, table.style.cell_divider_thickness, 0, 0), .color = table.style.border_color })
+                .border(.{ .thickness = .{ .bottom = table.style.cell_divider_thickness }, .color = table.style.border_color })
                 .height(.px(table.style.row_height))
                 .width(.px(table.row_width))
                 .inlineStyle("min-width: 600px", .{})
                 .children({
                 Box()
-                    .border(.{ .thickness = .tblr(0, 0, table.style.cell_divider_thickness, table.style.cell_divider_thickness), .color = table.style.border_color })
+                    .border(.{ .thickness = .horizontal(table.style.cell_divider_thickness), .color = table.style.border_color })
                     .borderStyle(table.style.cell_divider_style)
                     .width(.percent(100))
                     .height(.px(table.style.row_height))
@@ -1313,8 +1313,8 @@ pub fn DynamicTable(
             }.toggleClose, .{table});
         }
 
-        fn renderContextAction(table: *Self, comptime on_click: anytype, label: []const u8, icon: Vapor.IconType) void {
-            const icon_token: Vapor.IconType = if (table.context_menu.copied) .check else icon;
+        fn renderContextAction(table: *Self, comptime on_click: anytype, label: []const u8, icon: Vapor.IconTokens) void {
+            const icon_token: Vapor.IconTokens = if (table.context_menu.copied) .check else icon;
             Button(on_click, .{table})
                 .pointer()
                 .width(.percent(100))
@@ -1356,7 +1356,7 @@ pub fn DynamicTable(
                 },
                 .all => table.data,
                 else => {
-                    Vapor.printErr("Error: called Rows() in virtual mode", .{});
+                    Vapor.print(.err, "Error: called Rows() in virtual mode", .{});
                     unreachable;
                 },
             };
@@ -1406,7 +1406,7 @@ pub fn DynamicTable(
                         .minWidth(.px(220))
                         .width(.px(table.style.column_width))
                         .padding(.all(4))
-                        .border(.simple(.palette(.text_color)))
+                        .border(.thin(.palette(.text_color)))
                         .background(.palette(.background))
                         .spacing(8)
                         .children({
@@ -1432,10 +1432,10 @@ pub fn DynamicTable(
                         break :blk Box()
                             .onEvent(.dblclick, onRowClick, .{ table, row })
                             .pointer()
-                            .border(.{ .thickness = .tblr(0, table.style.cell_divider_thickness, 0, 0), .color = table.style.border_color })
+                            .border(.{ .thickness = .{ .bottom = table.style.cell_divider_thickness }, .color = table.style.border_color })
                             .hover(.{ .background = table.style.hover_background, .text_color = table.style.hover_text_color });
                     } else blk: {
-                        break :blk Box().border(.{ .thickness = .tblr(0, table.style.cell_divider_thickness, 0, 0), .color = table.style.border_color });
+                        break :blk Box().border(.{ .thickness = .{ .bottom = table.style.cell_divider_thickness }, .color = table.style.border_color });
                     };
 
                     box
@@ -1448,7 +1448,7 @@ pub fn DynamicTable(
                         .inlineStyle("min-width: 600px", .{})
                         .children({
                         Box()
-                            .border(.{ .thickness = .tblr(0, 0, table.style.cell_divider_thickness, table.style.cell_divider_thickness), .color = table.style.border_color })
+                            .border(.{ .thickness = .horizontal(table.style.cell_divider_thickness), .color = table.style.border_color })
                             .borderStyle(table.style.cell_divider_style)
                             .width(.percent(100))
                             .height(.px(table.style.row_height))
@@ -1532,12 +1532,12 @@ pub fn DynamicTable(
                     .background(table.style.background)
                     .height(.px(26))
                     .width(.px(36))
-                    .shadow(Vapor.Types.NewShadow.init().inset(0, -2, .transparentizeHex(.black, 0.3)))
+                    .shadow(Vapor.Types.NewShadow.init().inset(0, -2, .transparentize(.black, 0.3)))
                     .children({
                     if (std.mem.eql(u8, label, "to save")) {
                         Vapor.Svg(.{ .svg = save_icon })
                             .fill(table.style.text_color)
-                            .size(.px(16))
+                            .size(.squarePx(16))
                             .end();
                     } else {
                         Text("esc").font(14, 300, table.style.text_color).fontFamily(table.style.font_family).end();
@@ -1560,12 +1560,7 @@ pub fn DynamicTable(
                 .background(table.style.background)
                 .height(.fit)
                 .border(.round(table.style.border_color, .all(table.style.border_radius)))
-                .shadow(.{
-                .top = 4,
-                .spread = 2,
-                .blur = 6,
-                .color = .transparentizeHex(.black, 0.05),
-            });
+                .shadow(Vapor.Types.Shadow.init().dropSpread(0, 4, 6, 2, .transparentize(.black, 0.05)));
         }
 
         fn Search(table: *Self) void {
@@ -1580,7 +1575,7 @@ pub fn DynamicTable(
                         .children({
                         Vapor.Svg(.{ .svg = search_icon })
                             .fill(table.style.checkbox_icon_color)
-                            .size(.px(16))
+                            .size(.squarePx(16))
                             .end();
                     });
                     TextField(.string)
@@ -1591,7 +1586,7 @@ pub fn DynamicTable(
                         .fontFamily(table.style.font_family).background(.transparent)
                         .font(16, 300, table.style.icon_color)
                         .val(&table.search_box.text)
-                        .onEventCtx(.input, search, .{table})
+                        .onEvent(.input, search, .{table})
                         .end();
                     Button(clearText, .{table})
                         .ariaLabel("Search Filter")
@@ -1599,7 +1594,7 @@ pub fn DynamicTable(
                         .children({
                         Vapor.Svg(.{ .svg = x_lg })
                             .fill(table.style.icon_color)
-                            .size(.px(16))
+                            .size(.squarePx(16))
                             .end();
                     });
                 });
@@ -1613,7 +1608,7 @@ pub fn DynamicTable(
         fn handleFilter(table: *Self, comptime FT: type, value: FT) void {
             const text = fieldToString(value);
             if (table.enum_filters.get(text)) |_| {
-                if (!table.enum_filters.remove(text)) Vapor.printErr("Failed to remove filter", .{});
+                if (!table.enum_filters.remove(text)) Vapor.print(.err, "Failed to remove filter", .{});
             } else {
                 _ = table.enum_filters.put(text, {}) catch unreachable;
             }
@@ -1630,7 +1625,7 @@ pub fn DynamicTable(
                         .background(if (active) table.style.tint else .transparent)
                         .pointer().layout(.left_center).duration(table.style.hover_duration)
                         .hover(.{ .background = table.style.tint, .text_color = table.style.checkbox_icon_color })
-                        .padding(.tblr(6, 6, 6, 24))
+                        .padding(.{ .top = 6, .bottom = 6, .left = 6, .right = 24 })
                         .border(.round(.transparent, .all(table.style.border_radius)))
                         .font(14, 300, if (active) table.style.checkbox_icon_color else table.style.text_color)
                         .children({
@@ -1653,7 +1648,7 @@ pub fn DynamicTable(
                 .a11y(Vapor.Accessibility.init().setRole(.navigation).setLabel("DynamicTable pagination"))
                 .width(.percent(100))
                 .layout(.x_between_center)
-                .padding(.tblr(8, 8, 18, 18))
+                .padding(.xy(18, 8))
                 .height(.px(table.style.row_height))
                 .spacing(8)
                 .pos(.relative)
@@ -1669,7 +1664,7 @@ pub fn DynamicTable(
                             .children({
                             Vapor.Svg(.{ .svg = chevron_left })
                                 .fill(table.style.icon_color)
-                                .size(.px(16))
+                                .size(.squarePx(16))
                                 .end();
                         });
                     }
@@ -1680,7 +1675,7 @@ pub fn DynamicTable(
                             .children({
                             Vapor.Svg(.{ .svg = chevron_right })
                                 .fill(table.style.icon_color)
-                                .size(.px(16))
+                                .size(.squarePx(16))
                                 .end();
                         });
                     }
@@ -1852,7 +1847,7 @@ pub fn DynamicTable(
 
         fn editColumnRow(
             table: *Self,
-            icon: Vapor.IconType,
+            icon: Vapor.IconTokens,
             label: []const u8,
             action: fn (*Self) void,
         ) void {
@@ -1914,7 +1909,7 @@ pub fn DynamicTable(
                         // ── Header ────────────────────────────────────────
                         Box()
                             .width(if (table.table_columns.len == 0) .percent(100) else .px(table.row_width))
-                            .border(.lr(table.style.border_color))
+                            .border(.horizontal(1, table.style.border_color))
                             .borderStyle(table.style.outer_border_style)
                             .pos(.relative)
                             .children({
@@ -1928,7 +1923,7 @@ pub fn DynamicTable(
                                     .a11y(Vapor.Accessibility.init().setRole(.row))
                                     .height(.px(table.style.row_height))
                                     .width(.percent(100))
-                                    .border(.tb(table.style.border_color))
+                                    .border(.vertical(1, table.style.border_color))
                                     .inlineStyle("min-width: 600px", .{})
                                     .children({
                                     Box().width(.percent(100)).height(.px(table.style.row_height)).layout(.x_between_center).children({
@@ -1964,7 +1959,7 @@ pub fn DynamicTable(
                                                 row
                                                     .a11y(Vapor.Accessibility.init().setRole(.column_header).setLabel(column.name))
                                                     .ref(&table.binded_cols[i])
-                                                    .border(.{ .thickness = .left(table.style.cell_divider_thickness), .color = table.style.border_color })
+                                                    .border(.{ .thickness = .{ .left = table.style.cell_divider_thickness }, .color = table.style.border_color })
                                                     .borderStyle(table.style.cell_divider_style)
                                                     .width(.px(table.style.column_width))
                                                     .height(.px(table.style.row_height))

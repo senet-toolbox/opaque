@@ -299,7 +299,7 @@ fn ErasedField() Vapor.TextFieldBuilder(.pure) {
     return TextArea()
         .height(.elastic(36, 256))
         .font(14, 300, null)
-        .padding(.tblr(8, 8, 12, 12))
+        .padding(.xy(12, 8))
         .resize(.none)
         .inlineStyle("field-sizing: content;", .{})
         .outline(.none, null)
@@ -462,30 +462,27 @@ pub fn render(field: Field) void {
     }
 
     // 1. Check focus state
-    const is_focused = if (focus_states) |fs| fs.get(stable_id) orelse blk: {
-        std.log.info("stable_id {s} doesnt exist", .{stable_id});
-        break :blk false;
-    } else blk: {
-        break :blk false;
-    };
+    const is_focused = if (focus_states) |fs| fs.get(stable_id) orelse false else false;
 
     text_field
         .border(.round(if (is_focused) .palette(.tint) else .palette(.border_color_light), .all(12)))
         .outline(.none, null)
         .background(background)
-        .shadow(.glow(3, if (is_focused) .transparentizeHex(.palette(.tint), 0.2) else .transparent))
+        .shadow(.glow(3, if (is_focused) .transparentize(.palette(.tint), 0.2) else .transparent))
         // .shadow(.{
         //     .color = if (is_focused) .transparentizeHex(.palette(.tint), 0.2) else .transparent,
         //     .spread = 3,
         // })
         // OVERRIDE Padding here to account for icons
-        .onEventCtx(.focus, handleFocus, .{stable_id})
-        .onEventCtx(.blur, handleBlur, .{stable_id})
-        .onEventCtx(.input, stringCallback, .{Callback{ .value = value, .on_change = field.on_change }})
-        .onEventCtx(.keydown, stringEnterCallback, .{Callback{ .value = value, .on_enter = field.on_enter }})
+        .onEvent(.focus, handleFocus, .{stable_id})
+        .onEvent(.blur, handleBlur, .{stable_id})
+        .onEvent(.input, stringCallback, .{Callback{ .value = value, .on_change = field.on_change }})
+        .onEvent(.keydown, stringEnterCallback, .{Callback{ .value = value, .on_enter = field.on_enter }})
         .width(.percent(100))
         .val(value.string)
-        .placeholder(if (field.placeholder) |placeholder| placeholder.string else "")
+        // The label names the field; with no placeholder of its own, it is
+        // the placeholder too.
+        .ariaLabel(field.label orelse "")
+        .placeholder(if (field.placeholder) |placeholder| placeholder.string else field.label orelse "")
         .end();
-    // });
 }

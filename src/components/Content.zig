@@ -10,7 +10,7 @@ const Custom = @import("../components/Custom.zig");
 const DocNavbar = @import("../components/DocNavbar.zig");
 const ListItem = Vapor.ListItem;
 const List = Vapor.List;
-const CtxButton = Vapor.CtxButton;
+const CtxButton = Vapor.Button;
 
 pub var boxes: []BoxNumber = undefined;
 // var bounds: Vapor.lib.Bounds = undefined;
@@ -74,9 +74,9 @@ pub fn new(default_text: []const u8) type {
                 .layout = .top_center,
                 .padding = .horizontal(12),
                 .visual = .{
-                    .layer = .grid(32, 1, .transparentizeHex(.palette(.grid_color), 0.9)),
+                    .layer = .grid(32, 1, .transparentize(.palette(.grid_color), 0.9)),
                     .border = .{
-                        .thickness = .lr(1),
+                        .thickness = .horizontal(1),
                         .color = .palette(.border_color_light),
                     },
                 },
@@ -91,7 +91,7 @@ pub fn new(default_text: []const u8) type {
                             .pos(.tr(.px(box.bounds.top - 80), .px(-56), .absolute)).zIndex(999)
                             .width(.px(56))
                             .height(.px(56))
-                            .border(.simple(color))
+                            .border(.thin(color))
                             .layout(.center)
                             .children({
                             TextFmt("{d}", .{box.number}).font(18, 300, color).end();
@@ -117,13 +117,13 @@ pub fn new(default_text: []const u8) type {
                         CtxButton(copy, .{self})
                             .ariaLabel("copy-markdown")
                             .style(&.{
-                            .visual = .{ .background = .transparent, .cursor = .pointer },
-                            .size = .w(.fit),
-                            .child_gap = 12,
-                            .padding = .tb(8, 8),
-                            .layout = .right_center,
-                            .interactive = .{ .hover = .{ .text_color = .palette(.tint) } },
-                        }).children({
+                                .visual = .{ .background = .transparent, .cursor = .pointer },
+                                .size = .w(.fit),
+                                .child_gap = 12,
+                                .padding = .vertical(8),
+                                .layout = .right_center,
+                                .interactive = .{ .hover = .{ .text_color = .palette(.tint) } },
+                            }).children({
                             if (copied) {
                                 Icon(.check).style(&.{
                                     .visual = .{ .font_size = 16 },

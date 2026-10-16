@@ -10,12 +10,12 @@ const Center = Vapor.Center;
 const Icon = Vapor.Icon;
 
 var background: Vapor.Types.Color = .palette(.background);
-var border: Vapor.Types.BorderGrouped = .round(.palette(.border_color_light), .all(12));
+var border: Vapor.Types.Border = .round(.palette(.border_color_light), .all(12));
 var group_title_color: Vapor.Types.Color = .hex("#8C8C8C");
 var text_color: Vapor.Types.Color = .black;
 var font_family: []const u8 = "Montserrat";
-const selected_background: Vapor.Types.Color = .transparentizeHex(.palette(.tint), 0.05);
-const selected_border: Vapor.Types.BorderGrouped = .round(.palette(.tint), .all(12));
+const selected_background: Vapor.Types.Color = .transparentize(.palette(.tint), 0.05);
+const selected_border: Vapor.Types.Border = .round(.palette(.tint), .all(12));
 const tint_color: Vapor.Types.Color = .palette(.tint);
 
 const Position = enum { top, bottom };
@@ -43,7 +43,7 @@ pub const StringSelect = struct {
     pub const Item = struct {
         value: []const u8,
         label: []const u8,
-        icon: ?Vapor.IconType = null,
+        icon: ?Vapor.IconTokens = null,
         is_selected: bool = false,
         _is_shown: bool = true,
     };
@@ -53,7 +53,7 @@ pub const StringSelect = struct {
     _selected_item: ?Item = null,
     _closed: bool = true,
     _searchable: bool = false,
-    _search_box: Vapor.Binded = .{},
+    _search_box: Vapor.Element = .{},
     ctx: ?*anyopaque = null,
     on_select: ?*const fn (select: *Self, item: *Item) void = null,
     on_select_ctx: ?*const fn (item: *Item, ctx: ?*anyopaque) void = null,
@@ -61,18 +61,18 @@ pub const StringSelect = struct {
     render_trigger: bool = true,
     _x: f32 = 0,
     _y: f32 = 0,
-    binded_select: Vapor.Binded = .{},
-    binded_trigger: Vapor.Binded = .{},
+    binded_select: Vapor.Element = .{},
+    binded_trigger: Vapor.Element = .{},
     on_trigger: ?*const fn (select: *Self, ctx: ?*anyopaque) void = null,
     _did_initialize: bool = false,
     max_height: f32 = 256,
     is_detached: bool = false,
     _position: Position = .bottom,
     total_items: usize = 0,
-    border: Vapor.Types.BorderGrouped = .round(.palette(.border_color_light), .all(12)),
-    selected_border: Vapor.Types.BorderGrouped = .round(.palette(.tint), .all(12)),
+    border: Vapor.Types.Border = .round(.palette(.border_color_light), .all(12)),
+    selected_border: Vapor.Types.Border = .round(.palette(.tint), .all(12)),
     // shadow: Vapor.Types.Shadow = .{ .color = .transparentizeHex(.palette(.tint), 0.2), .spread = 3 },
-    shadow: ?Vapor.Types.Shadow = .glow(3, .transparentizeHex(tint_color, 0.2)),
+    shadow: ?Vapor.Types.Shadow = .glow(3, .transparentize(tint_color, 0.2)),
     height: Vapor.Types.Sizing = .px(36),
     arena: std.heap.ArenaAllocator,
     arena_allocator: std.mem.Allocator,
@@ -219,7 +219,7 @@ pub const StringSelect = struct {
             .layout(.left_center)
             .duration(100)
             .hoverBackground(selected_background)
-            .padding(.tblr(6, 6, 6, 24))
+            .padding(.{ .top = 6, .bottom = 6, .left = 6, .right = 24 })
             .border(.round(.transparent, if (select.border.radius) |radius| radius else .all(8)))
             .spacing(8)
             .children({
@@ -250,13 +250,13 @@ pub const StringSelect = struct {
         }
     }
 
-    fn createBindedTrigger(_: *Self) *Vapor.Binded {
-        const binded_trigger: *Vapor.Binded = Vapor.arena(.frame).create(Vapor.Binded) catch unreachable;
+    fn createBindedTrigger(_: *Self) *Vapor.Element {
+        const binded_trigger: *Vapor.Element = Vapor.arena(.frame).create(Vapor.Element) catch unreachable;
         binded_trigger.* = .{};
         return binded_trigger;
     }
 
-    fn toggleWithBindedTrigger(select: *Self, binded_trigger: *Vapor.Binded) void {
+    fn toggleWithBindedTrigger(select: *Self, binded_trigger: *Vapor.Element) void {
         if (select.is_detached) {
             select.toggle();
             return;
@@ -273,7 +273,7 @@ pub const StringSelect = struct {
         select.toggle();
     }
 
-    fn toggleWithBindedTriggerVP(select: *Self, binded_trigger: *Vapor.Binded) void {
+    fn toggleWithBindedTriggerVP(select: *Self, binded_trigger: *Vapor.Element) void {
         if (select.is_detached) {
             select.toggle();
             return;
@@ -290,7 +290,7 @@ pub const StringSelect = struct {
         select.toggle();
     }
 
-    fn toggleWithBindedTriggerVPCtx(select: *Self, binded_trigger: *Vapor.Binded, callback: anytype, args: anytype) void {
+    fn toggleWithBindedTriggerVPCtx(select: *Self, binded_trigger: *Vapor.Element, callback: anytype, args: anytype) void {
         if (select.is_detached) {
             select.toggle();
             return;
@@ -328,7 +328,7 @@ pub const StringSelect = struct {
                     //     .color = if (select._closed) .transparent else .transparentizeHex(.palette(.tint), 0.2),
                     //     .spread = 3,
                     // })
-                    .shadow(.glow(3, .transparentizeHex(.palette(.tint), 0.2)))
+                    .shadow(.glow(3, .transparentize(.palette(.tint), 0.2)))
                     .children({
                     Box()
                         .width(.percent(100))
@@ -421,12 +421,12 @@ pub const StringSelect = struct {
                     //     .blur = 6,
                     //     .color = .transparentizeHex(.black, 0.05),
                     // })
-                    .shadow(.insetGlow(0, 4, 2, .transparentizeHex(.black, 0.05)))
+                    .shadow(Vapor.Types.Shadow.init().dropSpread(0, 4, 2, 1, .transparentize(.black, 0.05)))
                     .children({
                     Stack()
                         .height(.elastic(select.height.size.min, select.max_height))
                         .width(.percent(100))
-                        .scroll(.scroll_y())
+                        .scroll(.scrollY())
                         .children({
                         for (select.items) |*item| {
                             select.renderItem(item);
@@ -459,7 +459,7 @@ pub const StringSelect = struct {
     pub fn renderPos(select: *Self, position: Position) void {
         select._position = position;
         if (!select._did_initialize) {
-            Vapor.printErr("Error: StringSelect component not initialized\n Call StringSelect.init(...) or StringSelect.fromItems(...) before rendering", .{});
+            Vapor.print(.err, "Error: StringSelect component not initialized\n Call StringSelect.init(...) or StringSelect.fromItems(...) before rendering", .{});
             return;
         }
         Stack()
@@ -474,7 +474,7 @@ pub const StringSelect = struct {
 
     pub fn render(select: *Self) void {
         if (!select._did_initialize) {
-            Vapor.printErr("Error: StringSelect component not initialized\n Call StringSelect.init(...) or StringSelect.fromItems(...) before rendering", .{});
+            Vapor.print(.err, "Error: StringSelect component not initialized\n Call StringSelect.init(...) or StringSelect.fromItems(...) before rendering", .{});
             return;
         }
         Stack()

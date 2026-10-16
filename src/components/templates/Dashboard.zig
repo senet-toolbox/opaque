@@ -11,7 +11,7 @@ const TextFmt = Vapor.TextFmt;
 const TextField = Vapor.TextField;
 const TextArea = Vapor.TextArea;
 const Animation = Vapor.Animation;
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 const toggleTheme = @import("../../routes/vapor-ui/VaporUINav.zig").toggleTheme;
 
 // Import UI Components
@@ -24,14 +24,14 @@ const ComboBoxStruct = @import("../../components/ComboBox.zig");
 const ToastStruct = @import("../../components/Toast.zig");
 const SheetStruct = @import("../../components/Sheet.zig");
 const FieldStruct = @import("../../components/Field.zig");
-const TooltipStruct = @import("../../components/Tooltip.zig");
+const TooltipStruct = @import("../../components/ToolTip.zig");
 const SwitchStruct = @import("../../components/Switch.zig");
 const TabsStruct = @import("../../components/Tabs.zig");
 const AccordionStruct = @import("../../components/Accordion.zig");
 const SliderStruct = @import("../../components/Slider.zig");
 const GroupStruct = @import("../../components/Group.zig");
 const Button = @import("../../components/Button.zig").Button;
-const SideBar = @import("../../components/SideBar.zig");
+const SideBar = @import("../../components/Sidebar.zig");
 
 const Dashboard = @This();
 
@@ -355,7 +355,7 @@ fn initSampleData() void {
         .{ .id = 18, .customer = "Daniel Garcia", .email = "daniel.g@corp.net", .amount = 6700, .status = .completed, .date = "Jan 4, 2026", .method = "Wire Transfer" },
         .{ .id = 19, .customer = "Evelyn Robinson", .email = "evelyn@retail.shop", .amount = 420, .status = .completed, .date = "Jan 3, 2026", .method = "Visa •••• 5678" },
         .{ .id = 20, .customer = "Henry Clark", .email = "henry.c@finance.ltd", .amount = 18500, .status = .completed, .date = "Jan 3, 2026", .method = "Wire Transfer" },
-    }) catch |err| Vapor.printErr("Failed to append transactions: {any}", .{err});
+    }) catch |err| Vapor.print(.err, "Failed to append transactions: {any}", .{err});
 }
 
 // Chart data
@@ -694,7 +694,7 @@ fn renderNavigation() void {
             Text("MENU")
                 .font(10, 600, Theme.text_muted)
                 .fontFamily("IBM Plex Mono,monospace")
-                .margin(.b(8))
+                .margin(.{ .bottom = 8 })
                 .end();
 
             for (std.enums.values(NavItem)) |nav_item| {
@@ -744,15 +744,15 @@ fn renderNavButton(item: NavItem) void {
     ButtonCtx(selectNav, .{item})
         .width(.percent(100))
         .padding(.xy(14, 4))
-        .background(if (is_active) .transparentizeHex(.palette(.tint), 0.1) else .transparent)
-        .border(.r(1, if (is_active) .palette(.tint) else .transparent))
-        .layer(if (is_active) .dot(0.5, 6, .transparentizeHex(.palette(.tint), 0.3)) else null)
+        .background(if (is_active) .transparentize(.palette(.tint), 0.1) else .transparent)
+        .border(.right(1, if (is_active) .palette(.tint) else .transparent))
+        .layer(if (is_active) .dot(0.5, 6, .transparentize(.palette(.tint), 0.3)) else null)
         .layout(.left_center)
         .spacing(12)
         .pointer()
         .duration(150)
         .hover(.{
-            .background = if (is_active) .transparentizeHex(.palette(.tint), 0.1) else .palette(.highlight_color),
+            .background = if (is_active) .transparentize(.palette(.tint), 0.1) else .palette(.highlight_color),
         })
         .children({
         Box()
@@ -913,7 +913,7 @@ fn renderMetricCard(
                 .children({
                 Box()
                     .padding(.xy(6, 3))
-                    .background(.transparentizeHex(if (is_positive) Theme.success else Theme.err, 0.5))
+                    .background(.transparentize(if (is_positive) Theme.success else Theme.err, 0.5))
                     .border(.round(if (is_positive) Theme.success else Theme.err, .all(4)))
                     .layout(.center)
                     .spacing(4)
@@ -941,7 +941,7 @@ fn renderDashboardView() void {
         .height(.percent(100))
         .padding(.all(28))
         .spacing(28)
-        .scroll(.scroll_y())
+        .scroll(.scrollY())
         .children({
         Box()
             .width(.percent(100))
@@ -1148,7 +1148,7 @@ fn renderTransactionsView() void {
         // Table
         Box()
             .width(.percent(100))
-            .layer(.grid(14, 1, .transparentizeHex(.black, 0.05)))
+            .layer(.grid(14, 1, .transparentize(.black, 0.05)))
             .children({
             transactions_table.render();
         });

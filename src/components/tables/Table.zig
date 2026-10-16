@@ -103,7 +103,7 @@ pub const TableStyle = struct {
     text_color_muted: Vapor.Types.Color = .palette(.text_muted),
     icon_color: Vapor.Types.Color = .black,
     border_color: Vapor.Types.Color = .transparentize(.black, 0.2),
-    tint: Vapor.Types.Color = .transparentizeHex(.palette(.tint), 0.8),
+    tint: Vapor.Types.Color = .transparentize(.palette(.tint), 0.8),
     checkbox_icon_color: Vapor.Types.Color = .white,
 
     // Hover / tapped cell highlight colors
@@ -116,7 +116,7 @@ pub const TableStyle = struct {
     edit_popup_border_color: Vapor.Types.Color = .transparentize(.black, 0.2),
 
     // ── Borders ──────────────────────────────────────────────────────────
-    border: Vapor.Types.BorderGrouped = .round(.transparentize(.black, 0.2), .all(6)),
+    border: Vapor.Types.Border = .round(.transparentize(.black, 0.2), .all(6)),
     border_radius: u8 = 6,
     /// Style of inter-cell dividers ('dashed', 'solid', etc).
     cell_divider_style: Vapor.Types.BorderStyle = .dashed,
@@ -311,7 +311,7 @@ pub fn Column(comptime T: type) type {
 pub fn Action(comptime T: type) type {
     return struct {
         label: []const u8,
-        icon: ?Vapor.IconType = null,
+        icon: ?Vapor.IconTokens = null,
         on_action: ?*const fn (item: *T) void = null,
     };
 }
@@ -435,7 +435,7 @@ pub fn Table(
         table_id: []const u8 = "data-table",
         total_width_percent: f32 = 100,
         row_background: ?Vapor.Types.Color = null,
-        row_border: ?Vapor.Types.BorderGrouped = null,
+        row_border: ?Vapor.Types.Border = null,
         row_spacing: ?u8 = null,
         x: f32 = 0,
         y: f32 = 0,
@@ -444,8 +444,8 @@ pub fn Table(
         current_value: *T = undefined,
         current_value_str: []const u8 = "",
         editMode: EditMode = .None,
-        text_area: Vapor.Binded = .{ .element_type = .TextArea },
-        container: Vapor.Binded = .{},
+        text_area: Vapor.Element = .{ .element_type = .TextArea },
+        container: Vapor.Element = .{},
         clickable: bool = true,
         on_item_click: ?*const fn (*T) void = null,
         on_row_click: ?*const fn (*T) void = null,
@@ -463,11 +463,14 @@ pub fn Table(
         arena: std.heap.ArenaAllocator = undefined,
         actions: []const Action(T) = config.actions orelse &.{},
 
-        binded_cols: []Vapor.Binded = &.{},
-        search_box: Vapor.Binded = .{},
+        binded_cols: []Vapor.Element = &.{},
+        search_box: Vapor.Element = .{},
         show_search: bool = false,
         show_filter: bool = false,
         clicked_index: usize = 0,
+        /// The column the rows are sorted by, and which way.
+        sort_key: ?[]const u8 = null,
+        sort_dir: Sort = .none,
         active_filters: []?[]const u8 = &.{},
         enum_filters: std.StringHashMap(void) = undefined,
 
@@ -496,7 +499,7 @@ pub fn Table(
             table.arena_allocator = table.arena.allocator();
 
             table.active_filters = table.arena_allocator.alloc(?[]const u8, table_columns.len) catch |err| blk: {
-                Vapor.printErr("Failed to allocate active_filters: {any}", .{err});
+                Vapor.print(.err, "Failed to allocate active_filters: {any}", .{err});
                 break :blk &.{};
             };
             @memset(table.active_filters, null);
@@ -553,7 +556,7 @@ pub fn Table(
             table.enum_filters = std.StringHashMap(void).init(table.arena_allocator);
 
             table.active_filters = table.arena_allocator.alloc(?[]const u8, table_columns.len) catch |err| blk: {
-                Vapor.printErr("Failed to allocate active_filters: {any}", .{err});
+                Vapor.print(.err, "Failed to allocate active_filters: {any}", .{err});
                 break :blk &.{};
             };
             @memset(table.active_filters, null);
@@ -582,7 +585,7 @@ pub fn Table(
             const delete_index = table.indexOfId(id) orelse return false;
 
             var new_data = table.arena_allocator.alloc(T, table.data.len - 1) catch |err| {
-                Vapor.printErr("Failed to allocate table data after delete: {any}", .{err});
+                Vapor.print(.err, "Failed to allocate table data after delete: {any}", .{err});
                 return false;
             };
 
@@ -607,11 +610,11 @@ pub fn Table(
         // =================================================================
 
         fn allocBindedCols(table: *Self) void {
-            table.binded_cols = table.arena_allocator.alloc(Vapor.Binded, table_columns.len) catch |err| blk: {
-                Vapor.printErr("Failed to allocate binded cols: {any}", .{err});
+            table.binded_cols = table.arena_allocator.alloc(Vapor.Element, table_columns.len) catch |err| blk: {
+                Vapor.print(.err, "Failed to allocate binded cols: {any}", .{err});
                 break :blk &.{};
             };
-            @memset(table.binded_cols, Vapor.Binded{});
+            @memset(table.binded_cols, Vapor.Element{});
         }
 
         fn computeRowWidth(table: *Self) f32 {
@@ -628,6 +631,7 @@ pub fn Table(
                 table.action_select = .fromItems(items);
                 table.action_select.?.render_trigger = false;
                 table.action_select.?.trigger_component = ActionTrigger;
+                table.action_select.?.trigger_label = "Row actions";
                 table.action_select.?.on_select = selectAction;
             }
         }
@@ -909,14 +913,30 @@ pub fn Table(
                         },
                         .@"enum" => @intFromEnum(val1) < @intFromEnum(val2),
                         .int, .float => val1 < val2,
-                        else => Vapor.printErr("Sorting not supported for {any}", .{@typeInfo(@TypeOf(val1))}),
+                        else => Vapor.print(.err, "Sorting not supported for {any}", .{@typeInfo(@TypeOf(val1))}),
                     };
                 }
             }.compare;
         }
 
+        /// Sorts by `key`: in its column's direction the first time, then the
+        /// other way on each click after.
         fn sortColumn(self: *Self, sort_type: Sort, comptime key: []const u8) void {
-            std.mem.sort(T, self.filtered_data.items, sort_type, makeSortFn(key));
+            const same = if (self.sort_key) |k| std.mem.eql(u8, k, key) else false;
+            const dir: Sort = if (same) switch (self.sort_dir) {
+                .asc => .desc,
+                .desc => .asc,
+                .none => sort_type,
+            } else sort_type;
+            self.sort_key = key;
+            self.sort_dir = dir;
+            std.mem.sort(T, self.filtered_data.items, dir, makeSortFn(key));
+        }
+
+        /// Which way the rows are sorted by `key`, if they are.
+        fn sortedBy(self: *const Self, key: []const u8) Sort {
+            const k = self.sort_key orelse return .none;
+            return if (std.mem.eql(u8, k, key)) self.sort_dir else .none;
         }
 
         fn toggleSearch(table: *Self, index: usize) void {
@@ -1034,7 +1054,7 @@ pub fn Table(
         /// Render a checkbox used for row and header selection.
         fn renderCheckbox(table: *Self, func: anytype, args: anytype, is_active: bool) void {
             Button(func, args)
-                .ariaLabel("DynamicTable Row Checkbox")
+                .a11y(Vapor.Accessibility.checkbox(is_active).setLabel("Select row"))
                 .width(.px(20))
                 .height(.px(20))
                 .cursor(.pointer)
@@ -1071,7 +1091,7 @@ pub fn Table(
                     .width(.px(table.style.column_width))
                     // .id(id)
                     .layout(.x_between_center)
-                    .border(.{ .thickness = .left(table.style.cell_divider_thickness), .color = table.style.border_color })
+                    .border(.{ .thickness = .{ .left = table.style.cell_divider_thickness }, .color = table.style.border_color })
                     .borderStyle(table.style.cell_divider_style)
                     .height(.px(table.style.row_height))
                     .padding(.horizontal(table.style.cell_padding_horizontal))
@@ -1102,7 +1122,7 @@ pub fn Table(
                             }
                         },
                         else => {
-                            Vapor.printErr("Type {any} not supported", .{@TypeOf(value)});
+                            Vapor.print(.err, "Type {any} not supported", .{@TypeOf(value)});
                         },
                     }
 
@@ -1178,13 +1198,13 @@ pub fn Table(
             const is_selected = table.includes(row.id);
 
             Box()
-                .border(.{ .thickness = .tblr(0, table.style.cell_divider_thickness, 0, 0), .color = table.style.border_color })
+                .border(.{ .thickness = .{ .bottom = table.style.cell_divider_thickness }, .color = table.style.border_color })
                 .height(.px(table.style.row_height))
                 .width(.px(table.row_width))
                 .inlineStyle("min-width: 600px", .{})
                 .children({
                 Box()
-                    .border(.{ .thickness = .tblr(0, 0, table.style.cell_divider_thickness, table.style.cell_divider_thickness), .color = table.style.border_color })
+                    .border(.{ .thickness = .horizontal(table.style.cell_divider_thickness), .color = table.style.border_color })
                     .borderStyle(table.style.cell_divider_style)
                     .width(.percent(100))
                     .height(.px(table.style.row_height))
@@ -1229,8 +1249,8 @@ pub fn Table(
             }.toggleClose, .{table});
         }
 
-        fn renderContextAction(table: *Self, comptime on_click: anytype, label: []const u8, icon: Vapor.IconType) void {
-            const icon_token: Vapor.IconType = if (table.context_menu.copied) .check else icon;
+        fn renderContextAction(table: *Self, comptime on_click: anytype, label: []const u8, icon: Vapor.IconTokens) void {
+            const icon_token: Vapor.IconTokens = if (table.context_menu.copied) .check else icon;
             Button(on_click, .{table})
                 .pointer()
                 .width(.percent(100))
@@ -1272,7 +1292,7 @@ pub fn Table(
                 },
                 .all => table.data,
                 else => {
-                    Vapor.printErr("Error: called Rows() in virtual mode", .{});
+                    Vapor.print(.err, "Error: called Rows() in virtual mode", .{});
                     unreachable;
                 },
             };
@@ -1306,10 +1326,10 @@ pub fn Table(
                         break :blk Box()
                             .onEvent(.dblclick, onRowClick, .{ table, row })
                             .pointer()
-                            .border(.{ .thickness = .tblr(0, table.style.cell_divider_thickness, 0, 0), .color = table.style.border_color })
+                            .border(.{ .thickness = .{ .bottom = table.style.cell_divider_thickness }, .color = table.style.border_color })
                             .hover(.{ .background = table.style.hover_background, .text_color = table.style.hover_text_color });
                     } else blk: {
-                        break :blk Box().border(.{ .thickness = .tblr(0, table.style.cell_divider_thickness, 0, 0), .color = table.style.border_color });
+                        break :blk Box().border(.{ .thickness = .{ .bottom = table.style.cell_divider_thickness }, .color = table.style.border_color });
                     };
 
                     box
@@ -1322,7 +1342,7 @@ pub fn Table(
                         .inlineStyle("min-width: 600px", .{})
                         .children({
                         Box()
-                            .border(.{ .thickness = .tblr(0, 0, table.style.cell_divider_thickness, table.style.cell_divider_thickness), .color = table.style.border_color })
+                            .border(.{ .thickness = .horizontal(table.style.cell_divider_thickness), .color = table.style.border_color })
                             .borderStyle(table.style.cell_divider_style)
                             .width(.percent(100))
                             .height(.px(table.style.row_height))
@@ -1359,12 +1379,12 @@ pub fn Table(
                     .background(table.style.background)
                     .height(.px(26))
                     .width(.px(36))
-                    .shadow(Vapor.Types.NewShadow.init().inset(0, -2, .transparentizeHex(.black, 0.3)))
+                    .shadow(Vapor.Types.NewShadow.init().inset(0, -2, .transparentize(.black, 0.3)))
                     .children({
                     if (std.mem.eql(u8, label, "to save")) {
                         Vapor.Svg(.{ .svg = save_icon })
                             .fill(table.style.text_color)
-                            .size(.px(16))
+                            .size(.squarePx(16))
                             .end();
                     } else {
                         Text("esc").font(14, 300, table.style.text_color).fontFamily(table.style.font_family).end();
@@ -1387,7 +1407,7 @@ pub fn Table(
                 .background(table.style.background)
                 .height(.fit)
                 .border(.round(table.style.border_color, .all(table.style.border_radius)))
-                .shadow(.insetSpread(0, 4, 6, 2, .transparentizeHex(.black, 0.05)));
+                .shadow(Vapor.Types.Shadow.init().dropSpread(0, 4, 6, 2, .transparentize(.black, 0.05)));
         }
 
         fn Search(table: *Self) void {
@@ -1402,7 +1422,7 @@ pub fn Table(
                         .children({
                         Vapor.Svg(.{ .svg = search_icon })
                             .fill(table.style.checkbox_icon_color)
-                            .size(.px(16))
+                            .size(.squarePx(16))
                             .end();
                     });
                     TextField(.string)
@@ -1421,7 +1441,7 @@ pub fn Table(
                         .children({
                         Vapor.Svg(.{ .svg = x_lg })
                             .fill(table.style.icon_color)
-                            .size(.px(16))
+                            .size(.squarePx(16))
                             .end();
                     });
                 });
@@ -1435,7 +1455,7 @@ pub fn Table(
         fn handleFilter(table: *Self, comptime FT: type, value: FT) void {
             const text = fieldToString(value);
             if (table.enum_filters.get(text)) |_| {
-                if (!table.enum_filters.remove(text)) Vapor.printErr("Failed to remove filter", .{});
+                if (!table.enum_filters.remove(text)) Vapor.print(.err, "Failed to remove filter", .{});
             } else {
                 _ = table.enum_filters.put(text, {}) catch unreachable;
             }
@@ -1452,7 +1472,7 @@ pub fn Table(
                         .background(if (active) table.style.tint else .transparent)
                         .pointer().layout(.left_center).duration(table.style.hover_duration)
                         .hover(.{ .background = table.style.tint, .text_color = table.style.checkbox_icon_color })
-                        .padding(.tblr(6, 6, 6, 24))
+                        .padding(.{ .top = 6, .bottom = 6, .left = 6, .right = 24 })
                         .border(.round(.transparent, .all(table.style.border_radius)))
                         .font(14, 300, if (active) table.style.checkbox_icon_color else table.style.text_color)
                         .children({
@@ -1475,7 +1495,7 @@ pub fn Table(
                 .a11y(Vapor.Accessibility.init().setRole(.navigation).setLabel("DynamicTable pagination"))
                 .width(.percent(100))
                 .layout(.x_between_center)
-                .padding(.tblr(8, 8, 18, 18))
+                .padding(.xy(18, 8))
                 .height(.px(table.style.row_height))
                 .spacing(8)
                 .pos(.relative)
@@ -1491,7 +1511,7 @@ pub fn Table(
                             .children({
                             Vapor.Svg(.{ .svg = chevron_left })
                                 .fill(table.style.icon_color)
-                                .size(.px(16))
+                                .size(.squarePx(16))
                                 .end();
                         });
                     }
@@ -1502,7 +1522,7 @@ pub fn Table(
                             .children({
                             Vapor.Svg(.{ .svg = chevron_right })
                                 .fill(table.style.icon_color)
-                                .size(.px(16))
+                                .size(.squarePx(16))
                                 .end();
                         });
                     }
@@ -1650,7 +1670,7 @@ pub fn Table(
 
         fn editColumnRow(
             table: *Self,
-            icon: Vapor.IconType,
+            icon: Vapor.IconTokens,
             label: []const u8,
             action: fn (*Self) void,
         ) void {
@@ -1713,7 +1733,7 @@ pub fn Table(
                         // ── Header ────────────────────────────────────────
                         Box()
                             .width(if (table_columns.len == 0) .percent(100) else .px(table.row_width))
-                            .border(.lr(table.style.border_color))
+                            .border(.horizontal(1, table.style.border_color))
                             .borderStyle(table.style.outer_border_style)
                             .pos(.relative)
                             .children({
@@ -1727,7 +1747,7 @@ pub fn Table(
                                     .a11y(Vapor.Accessibility.init().setRole(.row))
                                     .height(.px(table.style.row_height))
                                     .width(.percent(100))
-                                    .border(.tb(table.style.border_color))
+                                    .border(.vertical(1, table.style.border_color))
                                     .inlineStyle("min-width: 600px", .{})
                                     .children({
                                     Box().width(.percent(100)).height(.px(table.style.row_height)).layout(.x_between_center).children({
@@ -1739,7 +1759,6 @@ pub fn Table(
                                             .children({
                                             const all_active = table.selection_mode == .all;
                                             Button(selectAll, .{table})
-                                                .ariaLabel("DynamicTable Row Checkbox")
                                                 .width(.px(20)).height(.px(20))
                                                 .cursor(.pointer).duration(table.style.hover_duration).hoverScale()
                                                 .a11y(Vapor.Accessibility.checkbox(all_active).setLabel("Select all"))
@@ -1763,7 +1782,7 @@ pub fn Table(
                                                 row
                                                     .a11y(Vapor.Accessibility.init().setRole(.column_header).setLabel(column.title))
                                                     .ref(&table.binded_cols[i])
-                                                    .border(.{ .thickness = .left(table.style.cell_divider_thickness), .color = table.style.border_color })
+                                                    .border(.{ .thickness = .{ .left = table.style.cell_divider_thickness }, .color = table.style.border_color })
                                                     .borderStyle(table.style.cell_divider_style)
                                                     .width(.px(table.style.column_width))
                                                     .height(.px(table.style.row_height))
@@ -1778,14 +1797,20 @@ pub fn Table(
                                                         Text(column.title).fontFamily(table.style.font_family).font(table.style.header_font_size, table.style.header_font_weight, null).end();
 
                                                         if (column.sort) |sort_type| {
+                                                            const sorted = table.sortedBy(column.key);
                                                             CommonToggleFilter(sortColumn, .{ table, sort_type, column.key })
-                                                                .ariaLabel(Vapor.fmtln("Sort by {s} {s}", .{ column.title, if (sort_type == .asc) "ascending" else "descending" }))
+                                                                // Names the column and how it is sorted now.
+                                                                .ariaLabel(Vapor.fmtln("Sort by {s}, {s}", .{ column.title, switch (sorted) {
+                                                                    .asc => "ascending",
+                                                                    .desc => "descending",
+                                                                    .none => "not sorted",
+                                                                } }))
                                                                 .hover(.{
                                                                     .background = table.style.tint,
                                                                     .text_color = table.style.checkbox_icon_color,
                                                                 })
                                                                 .children({
-                                                                switch (sort_type) {
+                                                                switch (if (sorted == .none) sort_type else sorted) {
                                                                     .asc => Icon(.sort_alpha_down).font(14, 700, null).end(),
                                                                     .desc => Icon(.sort_alpha_up).font(14, 700, null).end(),
                                                                     else => {},

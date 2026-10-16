@@ -20,14 +20,14 @@ const week_days: []const []const u8 = &.{
     "Su",
 };
 
-var border: Vapor.Types.BorderGrouped = .round(.transparent, .all(6));
-var selected_border: Vapor.Types.BorderGrouped = .round(.palette(.tint), .all(6));
+var border: Vapor.Types.Border = .round(.transparent, .all(6));
+var selected_border: Vapor.Types.Border = .round(.palette(.tint), .all(6));
 var selected_background: Vapor.Types.Color = .palette(.tint);
 var shadow: Vapor.Types.Shadow = .glow(2, .transparent);
-    // .color = .transparent,
-    // .spread = 2,
+// .color = .transparent,
+// .spread = 2,
 // };
-var selected_shadow: Vapor.Types.Shadow = .glow(2, .transparentizeHex(.palette(.tint), 0.1));
+var selected_shadow: Vapor.Types.Shadow = .glow(2, .transparentize(.palette(.tint), 0.1));
 // .color = .transparentizeHex(.palette(.tint), 0.1),
 // .spread = 2,
 // };
@@ -88,13 +88,13 @@ pub fn init(date_picker: *DatePicker) void {
         selected_date.month,
         selected_date.year,
     ) catch |err| {
-        Vapor.printErr("Error getting calendar view {any}", .{err});
+        Vapor.print(.err, "Error getting calendar view {any}", .{err});
         unreachable;
     };
 
     new();
     const current_months = DateTime.getMonths(&allocator, selected_date.year) catch {
-        Vapor.printErr("Error getting months", .{});
+        Vapor.print(.err, "Error getting months", .{});
         unreachable;
     };
 
@@ -165,25 +165,25 @@ fn selectDate(date_picker: *DatePicker, date_time: DateTime) void {
 }
 
 fn isSelectedColor(date_picker: *DatePicker, date_time: DateTime) Vapor.Types.Color {
-    if (date_picker._selected_date.day == date_time.day and date_picker._selected_date.month == date_time.month) {
+    if (isSameDay(date_picker._selected_date, date_time)) {
         return date_picker.tint;
     } else if (date_time.day == date_picker.current_date.day and date_time.month == date_picker.current_date.month) {
-        return .transparentizeHex(date_picker.tint, 0.1);
+        return .transparentize(date_picker.tint, 0.1);
     }
     return date_picker.background;
 }
 
-fn isSelectedBorder(date_picker: *DatePicker, date_time: DateTime) Vapor.Types.BorderGrouped {
-    if (date_picker._selected_date.day == date_time.day and date_picker._selected_date.month == date_time.month) {
+fn isSelectedBorder(date_picker: *DatePicker, date_time: DateTime) Vapor.Types.Border {
+    if (isSameDay(date_picker._selected_date, date_time)) {
         return selected_border;
     } else if (date_time.day == date_picker.current_date.day and date_time.month == date_picker.current_date.month) {
-        return .round(.transparentizeHex(date_picker.tint, 0.1), .all(6));
+        return .round(.transparentize(date_picker.tint, 0.1), .all(6));
     }
     return border;
 }
 
 fn isSelectedShadow(date_picker: *DatePicker, date_time: DateTime) Vapor.Types.Shadow {
-    if (date_picker._selected_date.day == date_time.day and date_picker._selected_date.month == date_time.month) {
+    if (isSameDay(date_picker._selected_date, date_time)) {
         return selected_shadow;
     } else if (date_time.day == date_picker.current_date.day and date_time.month == date_picker.current_date.month) {
         return selected_shadow;
@@ -199,12 +199,17 @@ fn isSelectedText(date_picker: *DatePicker, date_time: DateTime) Vapor.Types.Col
     if (DateTime.isWithinMonth(date_time, date_picker._viewed_date.month, date_picker._viewed_date.year)) {
         return date_picker.text_color;
     } else {
-        return .transparentizeHex(.grey, 0.7);
+        return .transparentize(.grey, 0.7);
     }
 }
 
+/// The same calendar day: day, month and year.
+fn isSameDay(a: DateTime, b: DateTime) bool {
+    return a.day == b.day and a.month == b.month and a.year == b.year;
+}
+
 fn isSelected(date_picker: *DatePicker, date_time: DateTime) bool {
-    if (date_picker._selected_date.day == date_time.day and date_picker._selected_date.month == date_time.month) {
+    if (isSameDay(date_picker._selected_date, date_time)) {
         return true;
     } else {
         return false;
@@ -215,7 +220,7 @@ fn isSelectedBackground(date_picker: *DatePicker, date_time: DateTime) Vapor.Typ
     if (DateTime.isWithinMonth(date_time, date_picker._viewed_date.month, date_picker._viewed_date.year)) {
         return date_picker.background;
     } else {
-        return .transparentizeHex(.grey, 0.1);
+        return .transparentize(.grey, 0.1);
     }
 }
 
@@ -268,7 +273,7 @@ fn getMonthDays(date_picker: *DatePicker) []DateTime {
         date_picker._viewed_date.month,
         date_picker._viewed_date.year,
     ) catch |err| {
-        Vapor.printErr("Calendar Error {any}\n", .{err});
+        Vapor.print(.err, "Calendar Error {any}\n", .{err});
         unreachable;
     };
     return _all_dates;
@@ -277,12 +282,12 @@ fn getMonthDays(date_picker: *DatePicker) []DateTime {
 pub fn render(date_picker: *DatePicker) void {
     Stack()
         .width(.px(date_picker._container_width))
-        .border(.round(.transparentizeHex(date_picker.border_color, 0.1), .all(8)))
-        .shadow(.glow(4, .transparentizeHex(date_picker.border_color, 0.05)))
+        .border(.round(.transparentize(date_picker.border_color, 0.1), .all(8)))
+        .shadow(.glow(4, .transparentize(date_picker.border_color, 0.05)))
         .background(date_picker.background)
         .layout(.center)
         .spacing(8)
-        .padding(.tb(12, 12))
+        .padding(.vertical(12))
         .children({
         Box()
             .width(.percent(90))
@@ -354,9 +359,11 @@ pub fn render(date_picker: *DatePicker) void {
                 .spacing(2)
                 .children({
                 for (date_picker._all_dates) |date| {
-                    const color: Vapor.Types.Color = if (date_picker.isSelected(date)) date_picker.background else .transparentizeHex(.black, 0.05);
+                    const color: Vapor.Types.Color = if (date_picker.isSelected(date)) date_picker.background else .transparentize(.black, 0.05);
                     Button(selectDate, .{ date_picker, date })
-                        .ariaLabel("Select Date")
+                        // Named by its full date, and pressed when chosen.
+                        .a11y(Vapor.Accessibility.init().setPressed(if (date_picker.isSelected(date)) .true_val else .false_val))
+                        .ariaLabel(Vapor.fmtln("{s} {d}, {d}", .{ DateTime.monthString(date.month), date.day, date.year }))
                         .cursor(.pointer)
                         .background(date_picker.background)
                         .width(.px(date_picker._cell_dim))

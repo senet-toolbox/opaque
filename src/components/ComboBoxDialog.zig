@@ -2,7 +2,7 @@ const std = @import("std");
 const Vapor = @import("vapor");
 const Text = Vapor.Text;
 const Box = Vapor.Box;
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 const Button = Vapor.Button;
 const TextFmt = Vapor.TextFmt;
 const TextField = Vapor.TextField;
@@ -13,13 +13,13 @@ const OverlayManager = @import("OverlayManager.zig");
 const OpaqueTypes = @import("OpaqueTypes.zig");
 
 var background: Vapor.Types.Color = .palette(.background);
-var border: Vapor.Types.BorderGrouped = .round(.palette(.border_color_light), .all(6));
+var border: Vapor.Types.Border = .round(.palette(.border_color_light), .all(6));
 var border_color: Vapor.Types.Color = .palette(.border_color_light);
 var group_title_color: Vapor.Types.Color = .hex("#8C8C8C");
 var text_color: Vapor.Types.Color = .palette(.text_color);
 var font_family: []const u8 = "IBM Plex Sans,monospace";
-var selected_background: Vapor.Types.Color = .transparentizeHex(.palette(.tint), 0.05);
-var selected_border: Vapor.Types.BorderGrouped = .round(.palette(.tint), .all(6));
+var selected_background: Vapor.Types.Color = .transparentize(.palette(.tint), 0.05);
+var selected_border: Vapor.Types.Border = .round(.palette(.tint), .all(6));
 var checkbox_color_icon: Vapor.Types.Color = .palette(.background);
 var checkbox_color: Vapor.Types.Color = .palette(.text_color);
 var tint: Vapor.Types.Color = .palette(.tint);
@@ -44,6 +44,7 @@ pub fn new() void {
 pub fn ComboBoxDialog(comptime T: type) type {
     return struct {
         const Self = @This();
+        const listbox_id = "combobox-listbox";
         pub const Group = struct {
             title: ?[]const u8 = null,
             items: []ItemT,
@@ -64,7 +65,7 @@ pub fn ComboBoxDialog(comptime T: type) type {
         _selected_items: std.AutoHashMap(*ItemT, void),
         _closed: bool = true,
         _is_open: bool = false,
-        _search_box: Vapor.Binded = .{},
+        _search_box: Vapor.Element = .{},
         _text_search: []const u8 = "",
         ctx: ?*anyopaque = null,
         on_select: ?*const fn (item: *ItemT) void = null,
@@ -79,10 +80,13 @@ pub fn ComboBoxDialog(comptime T: type) type {
         _x: f32 = 0,
         _y: f32 = 0,
         _width: f32 = 0,
-        binded_combobox: Vapor.Binded = .{},
-        binded_trigger: Vapor.Binded = .{},
+        binded_combobox: Vapor.Element = .{},
+        binded_trigger: Vapor.Element = .{},
         on_trigger: ?*const fn (combobox: *Self, ctx: ?*anyopaque) void = null,
         visible_items: usize = 0,
+        /// Shown items rendered so far this render: the same order the
+        /// arrow keys walk, so option ids match `current_index`.
+        _render_index: usize = 0,
         max_items: usize = 0,
 
         pub fn init(trigger: []const u8, groups: []const Group) Self {
@@ -165,8 +169,10 @@ pub fn ComboBoxDialog(comptime T: type) type {
             }
         }
 
-        fn renderItem(combobox: *Self, item: *ItemT, index: usize) void {
+        fn renderItem(combobox: *Self, item: *ItemT) void {
             if (!item.is_shown) return;
+            const index = combobox._render_index;
+            combobox._render_index += 1;
             const is_active = combobox.hovered_item == item;
 
             if (combobox.row_component) |row_component| {
@@ -181,11 +187,12 @@ pub fn ComboBoxDialog(comptime T: type) type {
             };
 
             const selected_border_color: Vapor.Types.Color = if (combobox.hovered_item == item) blk: {
-                break :blk .transparentizeHex(.palette(.tint), 1);
+                break :blk .transparentize(.palette(.tint), 1);
             } else blk: {
                 break :blk .transparent;
             };
             ButtonCtx(selectItem, .{ combobox, item })
+                .id(optionId(index))
                 .a11y(.option(item.is_selected, @intCast(index + 1), @intCast(combobox.visible_items)))
                 .tabIndex(if (is_active) 0 else -1)
                 .width(.percent(100))
@@ -194,22 +201,28 @@ pub fn ComboBoxDialog(comptime T: type) type {
                 .pointer()
                 .layout(.left_center)
                 .hover(.{
-                    .background = .transparentizeHex(.palette(.tint), 0.1),
+                    .background = .transparentize(.palette(.tint), 0.1),
                 })
-                .padding(.tblr(6, 6, 6, 24))
+                .padding(.{ .top = 6, .bottom = 6, .left = 6, .right = 24 })
                 .border(.round(selected_border_color, .all(6)))
                 .spacing(8)
                 .children({
                 if (item.icon) |icon| {
                     Icon(icon)
-                        .font(14, 300, .transparentizeHex(.palette(.text_color), 0.7))
+                        .font(14, 300, .transparentize(.palette(.text_color), 0.7))
                         .end();
                 }
                 Text(item.label)
                     .fontFamily(font_family)
-                    .font(14, 300, .transparentizeHex(.palette(.text_color), 0.7))
+                    .font(14, 300, .transparentize(.palette(.text_color), 0.7))
                     .end();
             });
+        }
+
+        /// The id of the `index`th shown option, which the search box names
+        /// as its aria-activedescendant.
+        fn optionId(index: usize) []const u8 {
+            return Vapor.fmtln("{s}-item-{d}", .{ listbox_id, index });
         }
 
         fn renderGroup(combobox: *Self, group: *Group) void {
@@ -228,8 +241,8 @@ pub fn ComboBoxDialog(comptime T: type) type {
                     .width(.percent(100))
                     .spacing(12)
                     .children({
-                    for (group.items, 0..) |*item, i| {
-                        combobox.renderItem(item, i);
+                    for (group.items) |*item| {
+                        combobox.renderItem(item);
                     }
                 });
             });
@@ -400,13 +413,13 @@ pub fn ComboBoxDialog(comptime T: type) type {
             }
         }
 
-        fn createBindedTrigger(_: *Self) *Vapor.Binded {
-            const binded_trigger: *Vapor.Binded = Vapor.arena(.frame).create(Vapor.Binded) catch unreachable;
+        fn createBindedTrigger(_: *Self) *Vapor.Element {
+            const binded_trigger: *Vapor.Element = Vapor.arena(.frame).create(Vapor.Element) catch unreachable;
             binded_trigger.* = .{};
             return binded_trigger;
         }
 
-        fn toggleWithBindedTrigger(combobox: *Self, binded_trigger: *Vapor.Binded) void {
+        fn toggleWithBindedTrigger(combobox: *Self, binded_trigger: *Vapor.Element) void {
             const bounds = binded_trigger.getBoundingClientRect() orelse return;
             combobox._x = bounds.left;
             combobox._y = bounds.top + bounds.height + 4;
@@ -414,7 +427,7 @@ pub fn ComboBoxDialog(comptime T: type) type {
             combobox.toggle();
         }
 
-        fn toggleWithBindedTriggerCtx(combobox: *Self, binded_trigger: *Vapor.Binded, ctx: ?*anyopaque) void {
+        fn toggleWithBindedTriggerCtx(combobox: *Self, binded_trigger: *Vapor.Element, ctx: ?*anyopaque) void {
             const bounds = binded_trigger.getBoundingClientRect() orelse return;
             combobox._x = bounds.left;
             combobox._y = bounds.top + bounds.height + 4;
@@ -444,8 +457,6 @@ pub fn ComboBoxDialog(comptime T: type) type {
         }
 
         pub fn renderComboBoxDialog(combobox: *Self) void {
-            const listbox_id = "combobox-listbox";
-
             Box()
                 .a11y(Vapor.Accessibility.dialog("Command Palette"))
                 .zIndex(999)
@@ -453,12 +464,12 @@ pub fn ComboBoxDialog(comptime T: type) type {
                 .children({
                 Stack()
                     .width(.percent(100))
-                    .padding(.tb(8, 0))
+                    .padding(.{ .top = 8 })
                     .onMount(mountSearchBox, .{combobox})
                     .children({
                     Box()
                         .width(.percent(100))
-                        .padding(.tblr(6, 14, 12, 12))
+                        .padding(.{ .top = 6, .bottom = 14, .left = 12, .right = 12 })
                         .pointer()
                         .border(.bottom(1, border_color))
                         .layout(.x_between_center)
@@ -477,10 +488,10 @@ pub fn ComboBoxDialog(comptime T: type) type {
                             .outline(.none, null)
                             .fontFamily(font_family)
                             .font(14, 300, group_title_color)
-                            .onEventCtx(.input, search, .{combobox})
+                            .onEvent(.input, search, .{combobox})
                             .a11y(Vapor.Accessibility.combobox(true, listbox_id)
                                 .setActiveDescendant(if (combobox.hovered_item) |_|
-                                    Vapor.fmtln("item-{d}", .{combobox.current_index})
+                                    optionId(combobox.current_index)
                                 else
                                     null)
                                 .setLabel("Search options"))
@@ -498,7 +509,7 @@ pub fn ComboBoxDialog(comptime T: type) type {
                     Box()
                         .a11y(.liveRegion(.polite))
                         .width(.percent(100))
-                        .padding(.tblr(8, 8, 12, 12))
+                        .padding(.xy(12, 8))
                         .layout(.right_center)
                         .spacing(16)
                         // .visuallyHidden() // You'd add this style helper
@@ -515,10 +526,11 @@ pub fn ComboBoxDialog(comptime T: type) type {
                         .ref(&combobox.binded_combobox)
                         .height(.elastic(36, 392))
                         .width(.percent(100))
-                        .scroll(.scroll_y())
+                        .scroll(.scrollY())
                         .padding(.all(8))
                         .children({
                         var has_visible = false;
+                        combobox._render_index = 0;
                         for (combobox.groups.items) |*group| {
                             for (group.items) |*item| {
                                 if (item.is_shown) has_visible = true;
@@ -554,10 +566,10 @@ pub fn ComboBoxDialog(comptime T: type) type {
                                 .layout(.x_between_center)
                                 .border(border)
                                 .background(background)
-                                .padding(.tblr(2, 2, 6, 6))
+                                .padding(.xy(6, 2))
                                 .duration(100)
                                 .shadow(Vapor.Types.NewShadow.init()
-                                    .inset(0, -2, .transparentizeHex(.black, 0.3)))
+                                    .inset(0, -2, .transparentize(.black, 0.3)))
                                 .children({
                                 Text("esc")
                                     .font(14, 300, .palette(.text_color))
@@ -577,10 +589,10 @@ pub fn ComboBoxDialog(comptime T: type) type {
                                 .layout(.x_between_center)
                                 .border(border)
                                 .background(background)
-                                .padding(.tblr(2, 2, 6, 6))
+                                .padding(.xy(6, 2))
                                 .duration(100)
                                 .shadow(Vapor.Types.NewShadow.init()
-                                    .inset(0, -2, .transparentizeHex(.black, 0.3)))
+                                    .inset(0, -2, .transparentize(.black, 0.3)))
                                 .children({
                                 Text("↑ ↓")
                                     .font(14, 300, .palette(.text_color))
@@ -600,10 +612,10 @@ pub fn ComboBoxDialog(comptime T: type) type {
                                 .layout(.x_between_center)
                                 .border(border)
                                 .background(background)
-                                .padding(.tblr(2, 2, 6, 6))
+                                .padding(.xy(6, 2))
                                 .duration(100)
                                 .shadow(Vapor.Types.NewShadow.init()
-                                    .inset(0, -2, .transparentizeHex(.black, 0.3)))
+                                    .inset(0, -2, .transparentize(.black, 0.3)))
                                 .children({
                                 Text("return")
                                     .font(14, 300, .palette(.text_color))
@@ -644,7 +656,7 @@ pub fn ComboBoxDialog(comptime T: type) type {
                 .animationExit("opaque-combobox-exit")
                 .width(.percent(34))
                 .background(background)
-                .shadow(.glow(30, .transparentizeHex(.black, 0.1)))
+                .shadow(.glow(30, .transparentize(.black, 0.1)))
                 .border(.round(.transparent, .all(6)))
                 .layout(.top_left)
                 .zIndex(9999)

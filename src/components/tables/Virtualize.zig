@@ -1,6 +1,6 @@
 const Vapor = @import("vapor");
 const std = @import("std");
-const Binded = Vapor.Binded;
+const Binded = Vapor.Element;
 const Box = Vapor.Box;
 const List = Vapor.List;
 const ListItem = Vapor.ListItem;
@@ -202,7 +202,7 @@ pub fn VirtualList(comptime T: type) type {
 
         pub fn renderWithCtx(self: *Self, ctx: ?*anyopaque) void {
             List()
-                .onEventCtx(.scroll, trackScroll, .{self})
+                .onEvent(.scroll, trackScroll, .{self})
                 .ref(&self.inner_container)
                 // .width(.percent(100))
                 .height(.grow)
@@ -249,12 +249,12 @@ pub fn VirtualList(comptime T: type) type {
 
         pub fn generate(self: *Self) void {
             List()
-                .onEventCtx(.scroll, trackScroll, .{self})
+                .onEvent(.scroll, trackScroll, .{self})
                 .ref(&self.inner_container)
                 .width(.percent(100))
                 .height(.px(self.container_height))
                 .direction(.column)
-                .scroll(.{ .x = .hidden, .y = .scroll_y() })
+                .scroll(.{ .x = .hidden, .y = .scrollY() })
                 .children({
                 // The Scroll Phantom: Forces the scrollbar to be the correct size
                 // But we don't put children inside it effectively (or we overlay them).

@@ -93,7 +93,7 @@ fn openDialog() void {
 }
 
 fn navigate(url: []const u8) void {
-    Kit.navigate(url);
+    Vapor.navigate(url);
     menu = !menu;
 }
 
@@ -123,7 +123,7 @@ pub fn clickEvent(_: *[]const u8, evt: *Vapor.Event) void {
 }
 
 fn goto(url: []const u8) void {
-    Vapor.Kit.navigate(url);
+    Vapor.navigate(url);
 }
 
 pub fn render() void {
@@ -182,10 +182,10 @@ pub fn render() void {
                     .style(&.{
                         .layout = .x_between_center,
                         .size = .hw(.px(38), .percent(70)),
-                        .padding = .tblr(4, 4, 8, 8),
-                        .visual = .{ .border = .simple(.hex("#E1E1E1")), .cursor = .pointer, .background = .palette(.background) },
+                        .padding = .xy(8, 4),
+                        .visual = .{ .border = .thin(.hex("#E1E1E1")), .cursor = .pointer, .background = .palette(.background) },
                         .interactive = .{ .hover = .{
-                            .border = .simple(.palette(.tint)),
+                            .border = .thin(.palette(.tint)),
                         } },
                     }).children({
                     Box().style(&.{ .layout = .left_center, .child_gap = 24 }).children({
@@ -320,7 +320,7 @@ pub fn render() void {
                 List().style(&.{
                     .list_style = .none,
                     .direction = .column,
-                    .padding = .tblr(16, 16, 8, 8),
+                    .padding = .xy(8, 16),
                     .child_gap = 16,
                     .size = .w(.percent(100)),
                 }).children({
@@ -332,7 +332,7 @@ pub fn render() void {
                                 .size = .w(.percent(100)),
                                 .layout = .left_center,
                                 .child_gap = 12,
-                                .padding = .tblr(10, 10, 8, 8),
+                                .padding = .xy(8, 10),
                                 .visual = .{ .cursor = .pointer, .background = .white },
                             }).children({
                                 Text(item.title).style(&.{

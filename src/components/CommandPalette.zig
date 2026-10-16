@@ -17,22 +17,35 @@ key_press: []const u8 = "k",
 on_click: ?*const fn () void = null,
 on_escape: ?*const fn () void = null,
 clicked: bool = false,
+/// The document keydown listener for the shortcut, while on the page.
+listener: ?u32 = null,
 
 fn mount(command_palette: *CommandPalette) void {
-    // OverlayManager.register(.keydown, clickEvent, command_palette);
-    _ = Vapor.addGlobalListenerCtx(.keydown, clickEvent, .{command_palette});
+    if (command_palette.listener == null) {
+        command_palette.listener = Vapor.addGlobalListenerCtx(.keydown, clickEvent, .{command_palette});
+    }
 }
 
+fn unmount(command_palette: *CommandPalette) void {
+    if (command_palette.listener) |id| {
+        _ = Vapor.removeGlobalListener(.keydown, id);
+        command_palette.listener = null;
+    }
+}
+
+/// Cmd + `key_press` on a Mac, Ctrl + `key_press` elsewhere, toggles it;
+/// Escape closes it.
 pub fn clickEvent(command_palette: *CommandPalette, evt: *Vapor.Event) void {
     const key = evt.key();
-    if (std.mem.eql(u8, command_palette.key_press, key) and evt.metaKey()) {
+    if (std.mem.eql(u8, command_palette.key_press, key) and (evt.metaKey() or evt.ctrlKey())) {
+        evt.preventDefault();
         command_palette.clicked = !command_palette.clicked;
         if (command_palette.on_click) |callback| {
             @call(.auto, callback, .{});
         }
     }
 
-    if (std.mem.eql(u8, "Escape", key)) {
+    if (std.mem.eql(u8, "Escape", key) and command_palette.clicked) {
         command_palette.clicked = false;
         if (command_palette.on_escape) |callback| {
             @call(.auto, callback, .{});
@@ -55,10 +68,11 @@ pub fn render(command_palette: *CommandPalette) void {
     const trans: f32 = if (command_palette.clicked) -70 else 0;
     const scale: f32 = if (command_palette.clicked) 0.9 else 1;
     const left: f32 = if (command_palette.clicked) 42 else 36;
-    const text_color: Vapor.Types.Color = if (command_palette.clicked) .palette(.border_color) else .transparentizeHex(.palette(.text_color), 0.5);
+    const text_color: Vapor.Types.Color = if (command_palette.clicked) .palette(.border_color) else .transparentize(.palette(.text_color), 0.5);
     Stack()
         .width(.percent(100))
         .onMount(mount, .{command_palette})
+        .onDestroy(unmount, .{command_palette})
         .children({
         Row()
             .background(background)
@@ -66,14 +80,14 @@ pub fn render(command_palette: *CommandPalette) void {
             .cursor(.pointer)
             .duration(100)
             .hover(.{ .border = .round(.palette(.border_color), .all(12)) })
-            .shadow(.insetGlow(2, 0, 2, .transparentizeHex(.black, 0.1)))
+            .shadow(Vapor.Types.Shadow.init().dropSpread(2, 0, 2, 1, .transparentize(.black, 0.1)))
             // .{ .top = 2, .blur = 2, .color = .transparentizeHex(.black, 0.1) })
             .border(.round(.palette(.border_color_light), .all(12)))
             .children({
             Button(toggle, .{command_palette})
                 .pos(.relative)
                 .width(.percent(100))
-                .padding(.tblr(10, 10, 12, 12))
+                .padding(.xy(12, 10))
                 .width(.percent(100))
                 .spacing(8)
                 .layout(.x_between_center)

@@ -5,7 +5,7 @@ const Box = Vapor.Box;
 const Button = Vapor.Button;
 
 var background: Vapor.Types.Color = .palette(.background);
-var border: Vapor.Types.BorderGrouped = .l(1, .palette(.border_color_light));
+var border: Vapor.Types.Border = .left(1, .palette(.border_color_light));
 var handle_bar_color: Vapor.Types.Color = .palette(.border_color_light);
 var starting_width: f32 = 128 + 256;
 
@@ -37,12 +37,16 @@ const Sheet = @This();
 closed: bool = true,
 direction: SheetDirection = .right,
 content: ?*const fn (*Sheet) void = null,
-binded: Vapor.Binded = .{},
+binded: Vapor.Element = .{},
 draggable: Vapor.Draggable = .{},
 size: f32 = 128 + 256,
 max_width: f32 = 512,
 mode: SheetMode = .overlay,
 on_close: ?*const fn (*Sheet) void = null,
+/// Names the drawer for screen readers.
+label: []const u8 = "Drawer",
+/// The document keydown listener for Escape, while the sheet is open.
+escape_listener: ?u32 = null,
 
 pub fn new() void {
     animateEnterRight = Vapor.Animation.init("opaque-sheet-enter-right")
@@ -115,6 +119,7 @@ pub fn init(direction: SheetDirection) Sheet {
 
 pub fn close(sheet: *Sheet) void {
     sheet.closed = true;
+    removeEscapeListener(sheet);
     if (sheet.on_close) |on_close| {
         on_close(sheet);
     }
@@ -198,14 +203,28 @@ fn getPosition(sheet: *Sheet) Vapor.Types.Position {
 }
 
 fn mount(sheet: *Sheet) void {
-    _ = Vapor.lib.addGlobalListenerCtx(.keydown, escape, .{sheet});
+    if (sheet.escape_listener == null) {
+        sheet.escape_listener = Vapor.lib.addGlobalListenerCtx(.keydown, escape, .{sheet});
+    }
+}
+
+/// The panel left the page, however it was closed.
+fn unmount(sheet: *Sheet) void {
+    removeEscapeListener(sheet);
+}
+
+fn removeEscapeListener(sheet: *Sheet) void {
+    if (sheet.escape_listener) |id| {
+        _ = Vapor.lib.removeGlobalListener(.keydown, id);
+        sheet.escape_listener = null;
+    }
 }
 
 fn escape(sheet: *Sheet, evt: *Vapor.Event) void {
     const key = evt.key();
     if (std.mem.eql(u8, key, "Escape")) {
         evt.preventDefault();
-        sheet.closed = true;
+        close(sheet);
     }
 }
 
@@ -219,7 +238,7 @@ pub fn render(sheet: *Sheet) void {
         Box()
             .animationEnter("opaque-sheet-background-enter")
             .animationExit("opaque-sheet-background-exit")
-            .background(.transparentizeHex(.black, 0.05))
+            .background(.transparentize(.black, 0.05))
             .blur(1)
             .size(.full)
             .pos(.tl(.px(0), .px(0), .fixed))
@@ -227,7 +246,8 @@ pub fn render(sheet: *Sheet) void {
             .layout(.center)
             .children({
             Button(close, .{sheet})
-                // .background(.transparentizeHex(.black, 0.3))
+                .ariaLabel("Close drawer")
+                .tabIndex(-1)
                 .size(.full)
                 .pos(.tl(.px(0), .px(0), .fixed))
                 .layout(.center)
@@ -238,6 +258,8 @@ pub fn render(sheet: *Sheet) void {
     }
     Box()
         .onMount(mount, .{sheet})
+        .onDestroy(unmount, .{sheet})
+        .a11y(Vapor.Accessibility.dialog(sheet.label))
         .pos(getPosition(sheet))
         .ref(&sheet.binded)
         .zIndex(9999)

@@ -2,7 +2,7 @@ const std = @import("std");
 const Vapor = @import("vapor");
 const Text = Vapor.Text;
 const Box = Vapor.Box;
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 const Button = Vapor.Button;
 const TextFmt = Vapor.TextFmt;
 const TextField = Vapor.TextField;
@@ -11,12 +11,12 @@ const Center = Vapor.Center;
 const Icon = Vapor.Icon;
 
 var background: Vapor.Types.Color = .palette(.background);
-var border: Vapor.Types.BorderGrouped = .round(.palette(.border_color_light), .all(12));
+var border: Vapor.Types.Border = .round(.palette(.border_color_light), .all(12));
 var group_title_color: Vapor.Types.Color = .hex("#8C8C8C");
 var text_color: Vapor.Types.Color = .palette(.text_color);
 var font_family: []const u8 = "Montserrat";
-var selected_background: Vapor.Types.Color = .transparentizeHex(.palette(.tint), 0.05);
-var selected_border: Vapor.Types.BorderGrouped = .round(.palette(.tint), .all(12));
+var selected_background: Vapor.Types.Color = .transparentize(.palette(.tint), 0.05);
+var selected_border: Vapor.Types.Border = .round(.palette(.tint), .all(12));
 var checkbox_color_icon: Vapor.Types.Color = .palette(.background);
 var checkbox_color: Vapor.Types.Color = .palette(.text_color);
 var tint: Vapor.Types.Color = .palette(.tint);
@@ -32,7 +32,7 @@ pub fn ComboBox(comptime T: type) type {
         pub const Item = struct {
             value: T,
             label: []const u8,
-            icon: ?Vapor.IconType = null,
+            icon: ?Vapor.IconTokens = null,
             is_selected: bool = false,
             _is_shown: bool = true,
         };
@@ -42,7 +42,9 @@ pub fn ComboBox(comptime T: type) type {
         groups: Vapor.Array(Group),
         _selected_items: std.AutoHashMap(*Item, void),
         _closed: bool = true,
-        _search_box: Vapor.Binded = .{},
+        /// The document keydown listener for Escape, while the list is open.
+        _escape_listener: ?u32 = null,
+        _search_box: Vapor.Element = .{},
         ctx: ?*anyopaque = null,
         on_select: ?*const fn (item: *Item) void = null,
         on_select_ctx: ?*const fn (item: *Item, ctx: ?*anyopaque) void = null,
@@ -51,8 +53,8 @@ pub fn ComboBox(comptime T: type) type {
         _x: f32 = 0,
         _y: f32 = 0,
         _width: f32 = 0,
-        binded_combobox: Vapor.Binded = .{},
-        binded_trigger: Vapor.Binded = .{},
+        binded_combobox: Vapor.Element = .{},
+        binded_trigger: Vapor.Element = .{},
         on_trigger: ?*const fn (combobox: *Self, ctx: ?*anyopaque) void = null,
         // binded_triggers_ptrs: Vapor.Array(Vapor.Binded),
 
@@ -124,6 +126,7 @@ pub fn ComboBox(comptime T: type) type {
         fn renderItem(combobox: *Self, item: *Item) void {
             if (!item._is_shown) return;
             ButtonCtx(selectItem, .{ combobox, item })
+                .a11y(Vapor.Accessibility.init().setRole(.option).setSelected(item.is_selected))
                 .width(.percent(100))
                 .height(.px(36))
                 // .background(if (item.is_selected) selected_background else background)
@@ -131,7 +134,7 @@ pub fn ComboBox(comptime T: type) type {
                 .layout(.left_center)
                 .duration(100)
                 .hoverBackground(selected_background)
-                .padding(.tblr(6, 6, 6, 24))
+                .padding(.{ .top = 6, .bottom = 6, .left = 6, .right = 24 })
                 .border(.round(.transparent, .all(8)))
                 .spacing(8)
                 .children({
@@ -195,15 +198,48 @@ pub fn ComboBox(comptime T: type) type {
 
         fn mountSearchBox(combobox: *Self) void {
             combobox._search_box.focus();
+            if (combobox._escape_listener == null) {
+                combobox._escape_listener = Vapor.lib.addGlobalListenerCtx(.keydown, escapeKey, .{combobox});
+            }
         }
 
-        fn createBindedTrigger(_: *Self) *Vapor.Binded {
-            const binded_trigger: *Vapor.Binded = Vapor.arena(.frame).create(Vapor.Binded) catch unreachable;
+        /// The list left the page, however it was closed.
+        fn unmountSearchBox(combobox: *Self) void {
+            if (combobox._escape_listener) |id| {
+                _ = Vapor.lib.removeGlobalListener(.keydown, id);
+                combobox._escape_listener = null;
+            }
+        }
+
+        fn escapeKey(combobox: *Self, evt: *Vapor.Event) void {
+            if (std.mem.eql(u8, evt.key(), "Escape")) {
+                evt.preventDefault();
+                combobox.close();
+            }
+        }
+
+        /// A trigger tells screen readers it opens a listbox, and whether it
+        /// is open; its text (the choice, or the placeholder) names it.
+        fn triggerA11y(combobox: *Self) Vapor.Accessibility {
+            return Vapor.Accessibility.init()
+                .setHasPopup(.listbox)
+                .setExpanded(!combobox._closed);
+        }
+
+        /// Several options can be chosen at once.
+        fn listA11y(combobox: *Self) Vapor.Accessibility {
+            var a11y = Vapor.Accessibility.listbox(combobox.trigger);
+            a11y.multiselectable = true;
+            return a11y;
+        }
+
+        fn createBindedTrigger(_: *Self) *Vapor.Element {
+            const binded_trigger: *Vapor.Element = Vapor.arena(.frame).create(Vapor.Element) catch unreachable;
             binded_trigger.* = .{};
             return binded_trigger;
         }
 
-        fn toggleWithBindedTrigger(combobox: *Self, binded_trigger: *Vapor.Binded) void {
+        fn toggleWithBindedTrigger(combobox: *Self, binded_trigger: *Vapor.Element) void {
             // const bounds = binded_trigger.getBoundingClientRect() orelse return;
             // combobox._x = 0;
             // combobox._y = bounds.height + 4;
@@ -216,7 +252,7 @@ pub fn ComboBox(comptime T: type) type {
             combobox.toggle();
         }
 
-        fn toggleWithBindedTriggerCtx(combobox: *Self, binded_trigger: *Vapor.Binded, ctx: ?*anyopaque) void {
+        fn toggleWithBindedTriggerCtx(combobox: *Self, binded_trigger: *Vapor.Element, ctx: ?*anyopaque) void {
             const bounds = binded_trigger.getBoundingClientRect() orelse return;
             combobox._x = bounds.left;
             combobox._y = bounds.top + bounds.height + 4;
@@ -235,6 +271,7 @@ pub fn ComboBox(comptime T: type) type {
                 .ref(binded_trigger).children({
                 if (combobox.trigger_component) |trigger| {
                     ButtonCtx(toggleWithBindedTriggerCtx, .{ combobox, binded_trigger, ctx })
+                        .a11y(combobox.triggerA11y())
                         .background(.transparent)
                         .width(.percent(100))
                         .height(.percent(100))
@@ -243,11 +280,12 @@ pub fn ComboBox(comptime T: type) type {
                     });
                 } else {
                     ButtonCtx(toggleWithBindedTrigger, .{ combobox, binded_trigger })
+                        .a11y(combobox.triggerA11y())
                         .width(.percent(100))
                         .border(if (combobox._closed) border else selected_border)
                         .background(background)
                         .padding(.all(8))
-                        .shadow(.glow(2, if (combobox._closed) .transparentizeHex(.black, 0.05) else .transparentize(.palette(.tint), 0.2))
+                        .shadow(.glow(2, if (combobox._closed) .transparentize(.black, 0.05) else .transparentize(.palette(.tint), 0.2))
                             // .{
                             //         .color = if (combobox._closed) .trasnparent else .transparentize(.palette(.tint), 0.1),
                             //         .spread = 2,
@@ -298,6 +336,7 @@ pub fn ComboBox(comptime T: type) type {
                 .ref(binded_trigger).children({
                 if (combobox.trigger_component) |trigger| {
                     ButtonCtx(toggleWithBindedTrigger, .{ combobox, binded_trigger })
+                        .a11y(combobox.triggerA11y())
                         .background(.transparent)
                         .width(.percent(100))
                         .height(.percent(100))
@@ -306,11 +345,12 @@ pub fn ComboBox(comptime T: type) type {
                     });
                 } else {
                     ButtonCtx(toggleWithBindedTrigger, .{ combobox, binded_trigger })
+                        .a11y(combobox.triggerA11y())
                         .width(.percent(100))
                         .border(if (combobox._closed) border else selected_border)
                         .background(background)
                         .padding(.all(8))
-                        .shadow(.insetGlow(if (combobox._closed) 2 else 0, 0, if (combobox._closed) 0 else 2, if (combobox._closed) .transparentizeHex(.black, 0.05) else .transparentize(.palette(.tint), 0.2)))
+                        .shadow(Vapor.Types.Shadow.init().dropSpread(if (combobox._closed) 2 else 0, 0, if (combobox._closed) 0 else 2, if (combobox._closed) 0 else 1, if (combobox._closed) .transparentize(.black, 0.05) else .transparentize(.palette(.tint), 0.2)))
                         //             Vapor.Types.NewShadow.init()
                         // pub fn dropSpread(self: Shadow, x: i16, y: i16, blur: u16, spread: i16, color: Color) Shadow {
                         //     return self.add(Layer.init(color).off(x, y).setBlur(blur).setSpread(spread));
@@ -349,7 +389,7 @@ pub fn ComboBox(comptime T: type) type {
                                     .width(.expand)
                                     .spacing(8)
                                     .layout(.left_center)
-                                    .scroll(.scroll_x())
+                                    .scroll(.scrollX())
                                     .children({
                                     var itr = combobox._selected_items.keyIterator();
                                     while (itr.next()) |item| {
@@ -360,7 +400,7 @@ pub fn ComboBox(comptime T: type) type {
                                                 .thickness = .none,
                                                 .radius = .all(4),
                                             })
-                                            .background(.transparentizeHex(.vapor_blue, 0.05))
+                                            .background(.transparentize(.vapor_blue, 0.05))
                                             .font(14, 300, text_color)
                                             .end();
                                     }
@@ -390,7 +430,7 @@ pub fn ComboBox(comptime T: type) type {
                         .border(border)
                         .background(background)
                         .padding(.all(4))
-                        .shadow(.insetGlow(4, 0, 2, .transparentizeHex(.black, 0.05)))
+                        .shadow(Vapor.Types.Shadow.init().dropSpread(4, 0, 2, 1, .transparentize(.black, 0.05)))
                         // .shadow(.{
                         //     .top = 4,
                         //     .spread = 2,
@@ -400,8 +440,9 @@ pub fn ComboBox(comptime T: type) type {
                         .children({
                         Box()
                             .onMount(mountSearchBox, .{combobox})
+                            .onDestroy(unmountSearchBox, .{combobox})
                             .width(.percent(100))
-                            .padding(.tblr(6, 14, 6, 6))
+                            .padding(.{ .top = 6, .bottom = 14, .left = 6, .right = 6 })
                             .pointer()
                             .layout(.x_between_center)
                             .children({
@@ -412,6 +453,7 @@ pub fn ComboBox(comptime T: type) type {
                                 .ref(&combobox._search_box)
                                 .val(&combobox._search_box.text)
                                 .placeholder("Search...")
+                                .ariaLabel("Search options")
                                 .width(.percent(100))
                                 .border(.none)
                                 .padding(.horizontal(12))
@@ -419,9 +461,10 @@ pub fn ComboBox(comptime T: type) type {
                                 .background(.transparent)
                                 .fontFamily(font_family)
                                 .font(14, 300, group_title_color)
-                                .onEventCtx(.input, search, .{combobox})
+                                .onEvent(.input, search, .{combobox})
                                 .end();
                             ButtonCtx(clearText, .{combobox})
+                                .ariaLabel("Clear search")
                                 .background(.transparent)
                                 .pointer()
                                 .children({
@@ -431,9 +474,10 @@ pub fn ComboBox(comptime T: type) type {
                             });
                         });
                         Stack()
+                            .a11y(combobox.listA11y())
                             .height(.elastic(36, 256))
                             .width(.percent(100))
-                            .scroll(.scroll_y())
+                            .scroll(.scrollY())
                             .children({
                             for (combobox.groups.items) |*group| {
                                 combobox.renderGroup(group);
@@ -463,6 +507,8 @@ pub fn ComboBox(comptime T: type) type {
                     .zIndex(50)
                     .children({
                     ButtonCtx(toggle, .{combobox})
+                        .ariaLabel("Close")
+                        .tabIndex(-1)
                         .size(.full)
                         .pos(.tl(.px(0), .px(0), .fixed))
                         .end();

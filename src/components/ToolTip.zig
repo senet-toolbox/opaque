@@ -2,7 +2,7 @@ const std = @import("std");
 const Vapor = @import("vapor");
 const Text = Vapor.Text;
 const Row = Vapor.Row;
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 const Button = Vapor.Button;
 const Anchor = Vapor.Anchor;
 
@@ -12,7 +12,7 @@ pub var svg_color: Vapor.Types.Color = .black;
 pub var border_color: Vapor.Types.Color = .hex("#e4e4e4");
 var tooltips: std.AutoHashMap(usize, *ToolTip) = undefined;
 pub var alternate_text_color: Vapor.Types.Color = .white;
-pub var border: Vapor.Types.BorderGrouped = .round(.transparent, .all(6));
+pub var border: Vapor.Types.Border = .round(.transparent, .all(6));
 
 pub const animateEnter = Vapor.Animation.init("opaque-tooltip-enter")
     .prop(.opacity, 0, 1)
@@ -81,6 +81,8 @@ pub fn new() void {
 
 pub const tooltip_service = struct {
     var active: ?*ToolTip = null;
+    /// The document keydown listener for Escape, while a tooltip is open.
+    var escape_listener: ?u32 = null;
     // var show_timer: TimerKey = ...;
     // var hide_timer: TimerKey = ...;
 
@@ -108,7 +110,7 @@ pub fn TooltipLayer() void {
             Anchor(anchor_name)
                 .animationEnter("opaque-tooltip-enter")
                 .animationExit("opaque-tooltip-exit")
-                .anchorPlacement(position)
+                .placement(position)
                 .zIndex(1000)
                 .onEvent(.pointerenter, onHover, .{tooltip})
                 .onEvent(.pointerleave, onLeave, .{tooltip})
@@ -125,6 +127,7 @@ pub fn TooltipLayer() void {
                     .margin(margin)
                     .children({
                     Row()
+                        .a11y(.tooltip())
                         .width(.fit)
                         .background(tooltip.options.background)
                         .border(tooltip.options.border)
@@ -132,7 +135,11 @@ pub fn TooltipLayer() void {
                         .direction(.column)
                         .width(.auto)
                         .children({
-                        tooltip.options.erased_callback.?.call();
+                        if (tooltip.options.erased_callback) |callback| {
+                            callback.call();
+                        } else {
+                            defaultContent(tooltip);
+                        }
                     });
                     if (corner_svg.len > 0) {
                         Vapor.Svg(.{ .svg = corner_svg })
@@ -221,14 +228,14 @@ fn getTransformOrigin(position: Vapor.Types.AnchorPlacement) Vapor.Types.Transfo
 
 fn getMargin(position: Vapor.Types.AnchorPlacement) Vapor.Types.Margin {
     return switch (position) {
-        .top => .b(2),
-        .bottom => .t(2),
-        .left => .r(2),
-        .right => .l(2),
-        .bottom_left => .t(2),
-        .bottom_right => .t(2),
-        .top_left => .b(2),
-        .top_right => .b(2),
+        .top => .{ .bottom = 2 },
+        .bottom => .{ .top = 2 },
+        .left => .{ .right = 2 },
+        .right => .{ .left = 2 },
+        .bottom_left => .{ .top = 2 },
+        .bottom_right => .{ .top = 2 },
+        .top_left => .{ .bottom = 2 },
+        .top_right => .{ .bottom = 2 },
         else => unreachable,
     };
 }
@@ -252,7 +259,7 @@ const TooltipOptions = struct {
     container: Vapor.Builder(.pure),
     background: Vapor.Types.Color = .black,
     stroke_color: Vapor.Types.Color = .black,
-    border: Vapor.Types.BorderGrouped = .round(.transparent, .all(6)),
+    border: Vapor.Types.Border = .round(.transparent, .all(6)),
     position: Vapor.Types.AnchorPlacement = .top,
     erased_callback: ?ErasedCallback = null,
 };
@@ -263,6 +270,43 @@ fn onHover(tooltip: *ToolTip, _: *Vapor.Event) void {
 
 fn show(tooltip: *ToolTip) void {
     tooltip_service.active = tooltip;
+    if (tooltip_service.escape_listener == null) {
+        tooltip_service.escape_listener = Vapor.lib.addGlobalListenerCtx(.keydown, escapeKey, .{});
+    }
+}
+
+/// Escape hides the tooltip without moving the pointer (WCAG 1.4.13).
+fn escapeKey(evt: *Vapor.Event) void {
+    if (std.mem.eql(u8, evt.key(), "Escape")) hideActive();
+}
+
+fn hideActive() void {
+    tooltip_service.active = null;
+    if (tooltip_service.escape_listener) |id| {
+        _ = Vapor.lib.removeGlobalListener(.keydown, id);
+        tooltip_service.escape_listener = null;
+    }
+}
+
+/// A trigger left the page; its tooltip must not outlive it.
+fn forget(tooltip: *ToolTip) void {
+    if (tooltip_service.active == tooltip) hideActive();
+}
+
+/// What a tooltip without a `Component` shows: its `component` fn, or its
+/// text.
+fn defaultContent(tooltip: *ToolTip) void {
+    Row()
+        .padding(.xy(12, 6))
+        .children({
+        if (tooltip.options.component) |component| {
+            @call(.auto, component, .{});
+        } else {
+            Text(tooltip.options.content)
+                .font(14, 300, alternate_text_color)
+                .end();
+        }
+    });
 }
 
 fn onLeave(tooltip: *ToolTip, _: *Vapor.Event) void {
@@ -273,8 +317,7 @@ fn onLeave(tooltip: *ToolTip, _: *Vapor.Event) void {
 }
 
 fn close(_: *ToolTip) void {
-    // options.show = false;
-    tooltip_service.active = null;
+    hideActive();
 }
 
 fn destroy(_: *ToolTip) void {
@@ -292,7 +335,7 @@ const Options = struct {
     trigger_ctx: ?*const fn (ctx: ?*anyopaque) void = null,
     background: Vapor.Types.Color = .black,
     stroke_color: Vapor.Types.Color = .black,
-    border: Vapor.Types.BorderGrouped = .round(.transparent, .all(6)),
+    border: Vapor.Types.Border = .round(.transparent, .all(6)),
     position: Vapor.Types.AnchorPlacement = .top,
 };
 
@@ -347,6 +390,9 @@ pub fn Trigger(tooltip: *ToolTip, trigger: anytype, args: anytype) *ToolTip {
         .width(.fit)
         .onEvent(.pointerenter, onHover, .{tooltip})
         .onEvent(.pointerleave, onLeave, .{tooltip})
+        .onEvent(.focusin, onHover, .{tooltip})
+        .onEvent(.focusout, onLeave, .{tooltip})
+        .onDestroy(forget, .{tooltip})
         .anchorSource(anchor_name)
         .children({
         @call(.auto, trigger, args);
@@ -412,54 +458,10 @@ pub fn Component(tooltip: *ToolTip, component: anytype, args: anytype) *ToolTip 
     return tooltip;
 }
 
+/// Finishes a `create(...).Trigger(...)` chain; the tooltip layer
+/// (`TooltipLayer`) draws the popup.
 pub fn end(tooltip: *ToolTip) void {
-    if (!tooltip.default) {
-        return;
-    }
-    const anchor_name = tooltip.options.anchor_name;
-    const position = tooltip.options.position;
-    const margin = getMargin(position);
-    const corner_svg = getCornerSvg(position);
-
-    Anchor(anchor_name)
-        .anchorPlacement(position)
-        .zIndex(1000)
-        .onEvent(.pointerenter, onHover, .{tooltip})
-        .onEvent(.pointerleave, onLeave, .{tooltip})
-        .onDestroy(destroy, .{tooltip})
-        .children({
-        if (tooltip.options.show) {
-            Row()
-                .width(.auto)
-                .animationEnter("opaque-tooltip-enter")
-                .animationExit("opaque-tooltip-exit")
-                .border(.round(.transparent, .all(6)))
-                .zIndex(1000)
-                .layout(.center)
-                .direction(.column)
-                .pos(.relative)
-                .margin(margin)
-                .children({
-                Row()
-                    .background(tooltip.options.background)
-                    .padding(.tblr(6, 6, 12, 12))
-                    .border(.round(.transparent, .all(6)))
-                    .layout(.center)
-                    .direction(.column)
-                    .width(.auto)
-                    .children({
-                    Text(tooltip.options.content)
-                        .font(14, 300, alternate_text_color).end();
-                });
-                Vapor.Svg(.{ .svg = corner_svg })
-                    .fill(tooltip.options.background)
-                    .stroke(tooltip.options.stroke_color)
-                    .end();
-            });
-        } else {
-            Vapor.Null();
-        }
-    });
+    _ = tooltip;
 }
 
 pub fn simple(title: []const u8, content: []const u8) void {
@@ -495,12 +497,12 @@ pub fn simpleWithPosition(title: []const u8, content: []const u8, position: Vapo
     const anchor_name = uuid;
     tooltip.options.anchor_name = anchor_name;
 
-    const margin = getMargin(position);
-    const corner_svg = getCornerSvg(position);
-
     hover_box
-        .onEventCtx(.pointerenter, onHover, .{tooltip})
-        .onEventCtx(.pointerleave, onLeave, .{tooltip})
+        .onEvent(.pointerenter, onHover, .{tooltip})
+        .onEvent(.pointerleave, onLeave, .{tooltip})
+        .onEvent(.focusin, onHover, .{tooltip})
+        .onEvent(.focusout, onLeave, .{tooltip})
+        .onDestroy(forget, .{tooltip})
         .anchorSource(anchor_name)
         .children({
         if (tooltip.options.trigger) |trigger| {
@@ -509,7 +511,8 @@ pub fn simpleWithPosition(title: []const u8, content: []const u8, position: Vapo
             @call(.auto, trigger, .{tooltip.options.ctx});
         } else {
             Row()
-                .padding(.tblr(4, 4, 12, 12))
+                .tabIndex(0)
+                .padding(.xy(12, 4))
                 .background(background)
                 .duration(100)
                 .hover(.{
@@ -519,49 +522,6 @@ pub fn simpleWithPosition(title: []const u8, content: []const u8, position: Vapo
                 .children({
                 Text(tooltip.options.title).font(14, 300, .palette(.text_color)).end();
             });
-        }
-    });
-    Anchor(anchor_name)
-        .anchorPlacement(position)
-        .zIndex(1000)
-        .onEvent(.pointerenter, onHover, .{tooltip})
-        .onEvent(.pointerleave, onLeave, .{tooltip})
-        .onDestroy(destroy, .{tooltip})
-        .children({
-        if (tooltip.options.show) {
-            Row()
-                .width(.auto)
-                .animationEnter("opaque-tooltip-enter")
-                .animationExit("opaque-tooltip-exit")
-                .border(.round(.transparent, .all(6)))
-                .zIndex(1000)
-                .layout(.center)
-                .direction(.column)
-                .pos(.relative)
-                .margin(margin)
-                .children({
-                Row()
-                    .background(alternate_background)
-                    .padding(.tblr(6, 6, 12, 12))
-                    .border(.round(.transparent, .all(6)))
-                    .layout(.center)
-                    .direction(.column)
-                    .width(.auto)
-                    .children({
-                    if (tooltip.options.component) |component| {
-                        @call(.auto, component, .{});
-                    } else {
-                        Text(tooltip.options.content)
-                            .font(14, 300, alternate_text_color).end();
-                    }
-                });
-                Vapor.Svg(.{ .svg = corner_svg })
-                    .fill(svg_color)
-                    .stroke(svg_color)
-                    .end();
-            });
-        } else {
-            Vapor.Null();
         }
     });
 }
@@ -599,15 +559,12 @@ pub fn render(tooltip_options: Options) void {
     const anchor_name = if (tooltip_options.id.len > 0) tooltip_options.id else uuid;
     tooltip.options.anchor_name = anchor_name;
 
-    const position = tooltip_options.position;
-    const transform_origin = getTransformOrigin(position);
-    // const position_style = getPositionStyle(position);
-    const margin = getMargin(position);
-    const corner_svg = getCornerSvg(position);
-
     hover_box
-        .onEventCtx(.pointerenter, onHover, .{tooltip})
-        .onEventCtx(.pointerleave, onLeave, .{tooltip})
+        .onEvent(.pointerenter, onHover, .{tooltip})
+        .onEvent(.pointerleave, onLeave, .{tooltip})
+        .onEvent(.focusin, onHover, .{tooltip})
+        .onEvent(.focusout, onLeave, .{tooltip})
+        .onDestroy(forget, .{tooltip})
         .anchorSource(anchor_name)
         .children({
         if (tooltip.options.trigger) |trigger| {
@@ -616,7 +573,8 @@ pub fn render(tooltip_options: Options) void {
             @call(.auto, trigger, .{tooltip.options.ctx});
         } else {
             Row()
-                .padding(.tblr(4, 4, 12, 12))
+                .tabIndex(0)
+                .padding(.xy(12, 4))
                 .background(background)
                 .duration(100)
                 .hover(.{
@@ -626,51 +584,6 @@ pub fn render(tooltip_options: Options) void {
                 .children({
                 Text(tooltip.options.title).font(14, 300, .palette(.text_color)).end();
             });
-        }
-    });
-    Anchor(anchor_name)
-        .transformOrigin(transform_origin)
-        .placement(.anchor_center)
-        .zIndex(1000)
-        .onEvent(.pointerenter, onHover, .{tooltip})
-        .onEvent(.pointerleave, onLeave, .{tooltip})
-        .onDestroy(destroy, .{tooltip})
-        .children({
-        if (tooltip.options.show) {
-            Row()
-                .width(.auto)
-                .transformOrigin(transform_origin)
-                .animationEnter("opaque-tooltip-enter")
-                .animationExit("opaque-tooltip-exit")
-                .border(.round(.transparent, .all(6)))
-                .zIndex(1000)
-                .layout(.center)
-                .direction(.column)
-                .pos(.relative)
-                .margin(margin)
-                .children({
-                Row()
-                    .background(alternate_background)
-                    .padding(.tblr(6, 6, 12, 12))
-                    .border(.round(.transparent, .all(6)))
-                    .layout(.center)
-                    .direction(.column)
-                    .width(.auto)
-                    .children({
-                    if (tooltip.options.component) |component| {
-                        @call(.auto, component, .{});
-                    } else {
-                        Text(tooltip.options.content)
-                            .font(14, 300, alternate_text_color).end();
-                    }
-                });
-                Vapor.Svg(.{ .svg = corner_svg })
-                    .fill(svg_color)
-                    .stroke(svg_color)
-                    .end();
-            });
-        } else {
-            Vapor.Null();
         }
     });
 }

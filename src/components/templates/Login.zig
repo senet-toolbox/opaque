@@ -9,7 +9,7 @@ const Tabs = Opaque.Tabs;
 const Field = Opaque.Field;
 const Button = Opaque.Button;
 const glitch = Opaque.glitch;
-const KeyStone = Vapor.KeyStone;
+const KeyStone = @import("keystone");
 const TrainTicket = @import("TrainTicket.zig");
 const utils = Vapor.utils;
 const Compiler = @import("../../main.zig");
@@ -55,13 +55,13 @@ fn createAccount() void {
     });
 }
 
-fn createdAccount(resp: Vapor.Kit.Response) void {
+fn createdAccount(resp: Vapor.Fetch.Result) void {
     if (resp.isOk()) {
         Vapor.println("Account created {s}", .{resp.Ok.body});
     }
 }
 
-fn validateSession(resp: Vapor.Kit.Response) void {
+fn validateSession(resp: Vapor.Fetch.Result) void {
     if (resp.isOk()) {
         Vapor.println("Session validated {s}", .{resp.Ok.body});
     }
@@ -73,7 +73,7 @@ fn loginWithProvider(provider: KeyStone.Provider) void {
 
 fn Card() Vapor.Builder(.pure) {
     return Stack()
-        .background(.transparentizeHex(.palette(.background), 0.5))
+        .background(.transparentize(.palette(.background), 0.5))
         .border(.round(.palette(.border_color_light), .all(12)))
         .width(.percent(100))
         .padding(.all(16))
@@ -91,16 +91,16 @@ fn onLeave(_: *Vapor.Event) void {
 
 fn AuthBtn(args: KeyStone.Provider, icon: *const Vapor.IconTokens) void {
     Button(loginWithProvider, .{args})
-        .size(.hw_px(36, 36))
+        .size(.hwPx(36, 36))
         .layout(.center)
-        .background(.transparentizeHex(.black, 0.8))
+        .background(.transparentize(.black, 0.8))
         .border(.round(.black, .all(8)))
         .pointer()
         .hover(.{
             .background = .yellow,
             .text_color = .black,
         })
-        .onEventCtx(.pointerenter, onHover, .{icon})
+        .onEvent(.pointerenter, onHover, .{icon})
         .onLeave(onLeave)
         .children({
         const active = hovered != null and std.mem.eql(u8, hovered.?.web.?, icon.web.?);
@@ -120,11 +120,11 @@ fn payment() void {
     });
 }
 
-fn handlePayment(resp: Vapor.Kit.Response) void {
+fn handlePayment(resp: Vapor.Fetch.Result) void {
     switch (resp) {
         .ok => |data| {
             Vapor.println("Payment data {any}", .{data.body});
-            Vapor.Kit.setWindowLocation(data.body);
+            Vapor.redirect(data.body);
         },
         .err => |err| {
             Vapor.println("Failed to fetch payment data: {s}", .{err.message});
@@ -191,7 +191,7 @@ pub fn render(login: *Login) void {
                     .children({
                     Button(submit, .{})
                         .animation("glitch")
-                        .background(.transparentizeHex(.black, 0.8))
+                        .background(.transparentize(.black, 0.8))
                         .border(.round(.black, .all(8)))
                         .padding(.all(6))
                         .pointer()
@@ -234,7 +234,7 @@ pub fn render(login: *Login) void {
                     .children({
                     Button(createAccount, .{})
                         .animation("glitch")
-                        .background(.transparentizeHex(.black, 0.8))
+                        .background(.transparentize(.black, 0.8))
                         .border(.round(.black, .all(8)))
                         .padding(.all(6))
                         .pointer()

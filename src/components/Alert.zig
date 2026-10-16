@@ -33,7 +33,7 @@ pub fn new() void {
 content: ?*const fn (*Alert) void = null,
 closed: bool = true,
 background: Vapor.Types.Color = .palette(.background),
-border: Vapor.Types.BorderGrouped = .round(.hex("#e4e4e4"), .all(12)),
+border: Vapor.Types.Border = .round(.hex("#e4e4e4"), .all(12)),
 on_enter: ?*const fn (*Alert) void = null,
 on_close: ?*const fn () void = null,
 
@@ -110,7 +110,7 @@ pub fn render(alert: *Alert) void {
             .children({});
         Box()
             .background(alert.background)
-            .shadow(.glow(30, .transparentizeHex(.black, 0.05)))
+            .shadow(.glow(30, .transparentize(.black, 0.05)))
             .border(alert.border)
             .width(.fit)
             .height(.fit)

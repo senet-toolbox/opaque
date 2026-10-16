@@ -48,8 +48,8 @@ label: ?[]const u8 = null,
 type: Vapor.Types.InputTypes = .string,
 /// Field must be a stable pointer, do not use a pointer within a render function, this is considered unsafe undefined behavior.
 value: GroupValue,
-icon_left: ?*const Vapor.IconTokens = null,
-icon_right: ?*const Vapor.IconTokens = null,
+icon_left: ?Vapor.IconTokens = null,
+icon_right: ?Vapor.IconTokens = null,
 
 fn handleFocus(id: usize, _: *Vapor.Event) void {
     if (focus_states) |*fs| {
@@ -81,8 +81,8 @@ fn ErasedField(field: Group) Vapor.TextFieldBuilder(.pure) {
     return TextField(field_type)
         .fieldName(if (field.label) |label| utils.toLowerCase(label, .frame) else "")
         .font(14, 300, null)
-        .padding(.tblr(8, 8, 12, 12))
-        .outline(.none)
+        .padding(.xy(12, 8))
+        .outline(.none, null)
         .background(.transparent)
         .fontFamily("Montserrat")
         .font(14, 300, .palette(.text_color));
@@ -106,96 +106,88 @@ pub fn render(field: Group) void {
     const label_left: f32 = if (is_focused) 12 + base_left else base_left;
 
     const z_index: f32 = if (is_focused) 10 else 0;
-    const text_color: Vapor.Types.Color = if (is_focused) .palette(.tint) else .transparentizeHex(.palette(.text_color), 0.5);
+    const text_color: Vapor.Types.Color = if (is_focused) .palette(.tint) else .transparentize(.palette(.text_color), 0.5);
 
     // 3. Calculate Input Padding based on icons
     // We reserve ~40px of space if an icon is present
     const pad_left: u8 = if (field.icon_left != null) 40 else 12;
     const pad_right: u8 = if (field.icon_right != null) 40 else 12;
 
-    Vapor.Static.HooksCtx(.destroy, destroy, .{stable_id})({
-        Stack()
-            .width(.percent(100))
-            .spacing(8)
-            .pos(.relative)
-            .height(.px(36))
-            .children({
-            // --- 1. RENDER LEFT ICON ---
-            if (field.icon_left) |ic| {
-                Box()
-                    .font(18, 300, text_color)
-                    .pos(.{ .type = .absolute, .left = .px(12), .top = .px(6) })
-                    .children({
-                    Icon(ic)
-                        .end();
-                });
-            }
-
-            // --- 2. RENDER RIGHT ICON ---
-            if (field.icon_right) |ic| {
-                Box()
-                    .font(18, 300, text_color)
-                    .pos(.{ .type = .absolute, .right = .px(12), .top = .px(6) })
-                    .children({
-                    Icon(ic)
-                        .end();
-                });
-            }
-
-            // --- 3. RENDER LABEL ---
-            if (field.label) |label| {
-                Label(label)
-                    .background(background)
-                    .pos(.{ .left = .px(label_left), .type = .absolute })
-                    .padding(.horizontal(2))
-                    .transition(.{
-                        .properties = &.{ .transform, .scale, .left },
-                        .duration = 100,
-                        .timing = .easeInOut,
-                    })
-                    .inlineStyle("transform: translateY({d}%) scale({d}); z-index: {d};", .{ trans, scale, z_index })
-                    .font(14, 300, text_color)
-                    .fontFamily("Montserrat")
+    Stack()
+        .width(.percent(100))
+        .spacing(8)
+        .pos(.relative)
+        .height(.px(36))
+        .onDestroy(destroy, .{stable_id})
+        .children({
+        // --- 1. RENDER LEFT ICON ---
+        if (field.icon_left) |ic| {
+            Box()
+                .font(18, 300, text_color)
+                .pos(.{ .type = .absolute, .left = .px(12), .top = .px(6) })
+                .children({
+                Icon(ic)
                     .end();
-            }
+            });
+        }
 
-            // --- 4. RENDER INPUT FIELD ---
-            switch (field.value) {
-                .string => {
-                    const text_field: Vapor.TextFieldBuilder(.pure) = ErasedField(field);
-                    text_field
-                        // OVERRIDE Padding here to account for icons
-                        .padding(.tblr(8, 8, pad_left, pad_right))
-                        .pos(.absolute)
-                        .onEventCtx(.focus, handleFocus, stable_id)
-                        .onEventCtx(.blur, handleBlur, stable_id)
-                        .width(.percent(100))
-                        .bind(field.value.string)
-                        .border(.round(if (is_focused) .palette(.tint) else .palette(.border_color_light), .all(12)))
-                        .shadow(.{
-                            .color = if (is_focused) .transparentizeHex(.palette(.tint), 0.2) else .transparent,
-                            .spread = 3,
-                        })
-                        .end();
-                },
-                .number => {
-                    const text_field: Vapor.TextFieldBuilder(.pure) = ErasedField(field);
-                    text_field
-                        // OVERRIDE Padding here to account for icons
-                        .padding(.tblr(8, 8, pad_left, pad_right))
-                        .onEventCtx(.focus, handleFocus, stable_id)
-                        .onEventCtx(.blur, handleBlur, stable_id)
-                        .border(.round(if (is_focused) .palette(.tint) else .palette(.border_color_light), .all(12)))
-                        .bind(field.value.number)
-                        .shadow(.{
-                            .color = if (is_focused) .transparentizeHex(.palette(.tint), 0.1) else .transparent,
-                            .spread = 2,
-                        })
-                        .end();
-                },
-                else => {},
-            }
-        });
+        // --- 2. RENDER RIGHT ICON ---
+        if (field.icon_right) |ic| {
+            Box()
+                .font(18, 300, text_color)
+                .pos(.{ .type = .absolute, .right = .px(12), .top = .px(6) })
+                .children({
+                Icon(ic)
+                    .end();
+            });
+        }
+
+        // --- 3. RENDER LABEL ---
+        if (field.label) |label| {
+            Label(label)
+                .background(background)
+                .pos(.{ .left = .px(label_left), .type = .absolute })
+                .padding(.horizontal(2))
+                .transition(.{
+                    .properties = &.{ .transform, .scale, .left },
+                    .duration = 100,
+                    .timing = .easeInOut,
+                })
+                .inlineStyle("transform: translateY({d}%) scale({d}); z-index: {d};", .{ trans, scale, z_index })
+                .font(14, 300, text_color)
+                .fontFamily("Montserrat")
+                .end();
+        }
+
+        // --- 4. RENDER INPUT FIELD ---
+        switch (field.value) {
+            .string => {
+                const text_field: Vapor.TextFieldBuilder(.pure) = ErasedField(field);
+                text_field
+                    // OVERRIDE Padding here to account for icons
+                    .padding(.{ .top = 8, .bottom = 8, .left = pad_left, .right = pad_right })
+                    .pos(.absolute)
+                    .onEvent(.focus, handleFocus, .{stable_id})
+                    .onEvent(.blur, handleBlur, .{stable_id})
+                    .width(.percent(100))
+                    .bind(field.value.string)
+                    .border(.round(if (is_focused) .palette(.tint) else .palette(.border_color_light), .all(12)))
+                    .shadow(Vapor.Types.Shadow.init().dropSpread(0, 0, 0, 3, if (is_focused) .transparentize(.palette(.tint), 0.2) else .transparent))
+                    .end();
+            },
+            .number => {
+                const text_field: Vapor.TextFieldBuilder(.pure) = ErasedField(field);
+                text_field
+                    // OVERRIDE Padding here to account for icons
+                    .padding(.{ .top = 8, .bottom = 8, .left = pad_left, .right = pad_right })
+                    .onEvent(.focus, handleFocus, .{stable_id})
+                    .onEvent(.blur, handleBlur, .{stable_id})
+                    .border(.round(if (is_focused) .palette(.tint) else .palette(.border_color_light), .all(12)))
+                    .bind(field.value.number)
+                    .shadow(Vapor.Types.Shadow.init().dropSpread(0, 0, 0, 2, if (is_focused) .transparentize(.palette(.tint), 0.1) else .transparent))
+                    .end();
+            },
+            else => {},
+        }
     });
 }
-

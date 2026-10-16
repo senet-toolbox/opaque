@@ -1,9 +1,9 @@
 const Vapor = @import("vapor");
-const ButtonCtx = Vapor.CtxButton;
+const ButtonCtx = Vapor.Button;
 const Edges = Vapor.Edges;
 
-var background: Vapor.Types.Color = .transparentizeHex(.hex("#F5F5F5"), 0.2);
-var border: Vapor.Types.BorderGrouped = .round(.palette(.border_color_light), .all(12));
+var background: Vapor.Types.Color = .transparentize(.hex("#F5F5F5"), 0.2);
+var border: Vapor.Types.Border = .round(.palette(.border_color_light), .all(12));
 
 const blue = Vapor.Types.Color.hex("#1e3a8a");
 const cyan = Vapor.Types.Color.hex("#00ffff");
@@ -70,8 +70,6 @@ const fancy = Edges.box("fancy")
     .onHover()
     .left().offset(-10).color(.magenta)
     .right().offset(-10).color(.cyan);
-
-
 
 pub fn new() void {
     btn_edges.build();

@@ -95,22 +95,22 @@ pub inline fn Code() fn (void) void {
 }
 pub fn render(code_editor: *CodeEditor, _: f32) void {
     Box().style(&.{
-        .size = .square_percent(100),
-        .scroll = .scroll_y(),
+        .size = .squarePercent(100),
+        .scroll = .scrollY(),
         .show_scrollbar = false,
         .direction = .column,
         .layout = .{ .x = .start, .y = .start },
         .visual = .{
             .background = .palette(.code_background),
-            .border = .simple(.palette(.disabled)),
+            .border = .thin(.palette(.disabled)),
             // .border_radius = .all(8),
         },
-        .padding = .tb(10, 10),
+        .padding = .vertical(10),
     })({
         Box().style(&.{
             .layout = .x_between_center,
             .size = .w(.percent(100)),
-            .padding = .tblr(0, 8, 12, 12),
+            .padding = .{ .bottom = 8, .left = 12, .right = 12 },
             .visual = .{
                 .border = .bottom(.palette(.disabled)),
             },
@@ -148,10 +148,10 @@ pub fn render(code_editor: *CodeEditor, _: f32) void {
                         // })
                         .style(&.{
                         .position = .relative,
-                        .size = .square_px(22),
+                        .size = .squarePx(22),
                         .transition = .{ .duration = 100 },
                         .visual = .{
-                            .border_radius = .all(4),
+                            .border = .{ .radius = .all(4) },
                             .background = .transparent,
                             .text_color = .palette(.disabled),
                             .cursor = .pointer,
@@ -185,18 +185,18 @@ pub fn render(code_editor: *CodeEditor, _: f32) void {
             });
         });
         Box().style(&.{
-            .size = .square_percent(100),
-            .scroll = .scroll_x(),
+            .size = .squarePercent(100),
+            .scroll = .scrollX(),
             .direction = .column,
             .layout = .{ .x = .start, .y = .start },
-            .padding = .tb(10, 10),
+            .padding = .vertical(10),
         })({
             Code()({
                 for (code_editor.processed_lines.items) |line| {
                     const color = if (line.is_removed) blk: {
-                        break :blk Vapor.Types.Color.transparentizeHex(.hex("#FF0000"), 0.1);
+                        break :blk Vapor.Types.Color.transparentize(.hex("#FF0000"), 0.1);
                     } else if (line.is_added) blk: {
-                        break :blk Vapor.Types.Color.transparentizeHex(.hex("#00FF00"), 0.1);
+                        break :blk Vapor.Types.Color.transparentize(.hex("#00FF00"), 0.1);
                     } else blk: {
                         break :blk Vapor.Types.Color.transparent;
                     };
@@ -204,7 +204,7 @@ pub fn render(code_editor: *CodeEditor, _: f32) void {
                         .size = .h(.px(18)),
                         .white_space = .pre,
                         .layout = .left_center,
-                        .padding = .l(24),
+                        .padding = .{ .left = 24 },
                         .visual = .{ .background = color },
                         .font_family = "DM Mono, monospace", // "IBM Plex Mono,monospace",
                         // .font_family = "IBM Plex Mono,monospace",

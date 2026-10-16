@@ -37,38 +37,10 @@ fn getTab(tabs: *Tabs, name: []const u8) ?Tab {
     return null;
 }
 
-fn component() void {
-    Vapor.print("component", .{});
-}
-
-fn closeTabs(_: void) void {
-    Vapor.print("closeTabs", .{});
-}
-
-pub fn Content(tag: []const u8) *const fn (void) void {
-    Vapor.print("Content", .{});
-    const tabs = peristant_tabs.get(tag) orelse blk: {
-        const tabs = Vapor.arena(.persist).create(Tabs) catch unreachable;
-        peristant_tabs.put(tag, tabs) catch unreachable;
-        break :blk tabs;
-    };
-    const current_tab = if (tabs.active_tab == null) tag else tabs.active_tab.?;
-    // 2. Default to index 0 if nothing is selected
-    // (You might want to store 'active_index: usize' instead of strings for O(1) lookups)
-
-    if (std.mem.eql(u8, current_tab, tag)) {
-        return closeTabs;
-    }
-    return closeTabs;
-}
-
 pub fn switchToTab(tag: []const u8, index: usize) void {
-    const tabs = peristant_tabs.get(tag) orelse blk: {
-        const t = Vapor.arena(.persist).create(Tabs) catch unreachable;
-        t.* = .{}; // Initialize list
-        peristant_tabs.put(tag, t) catch unreachable;
-        break :blk t;
-    };
+    // Tabs that have not rendered yet have no names to switch between.
+    const tabs = peristant_tabs.get(tag) orelse return;
+    if (index >= tabs.names.len) return;
     tabs.active_tab = tabs.names[index];
 }
 
@@ -166,18 +138,19 @@ pub fn Trigger(tabs: *Tabs, trigger_fn: *const fn (*Tabs, []const u8, bool) void
     }
 
     Box()
-        .a11y(.tabList("Main navigation tabs")) // Add this
+        .a11y(.tabList("Main navigation tabs"))
+        .onEvent(.keydown, navKey, .{tabs})
         .layout(.left_center)
         .padding(.all(2))
-        .scroll(.scroll_x())
+        .scroll(.scrollX())
         .spacing(12)
         .children({
         for (tabs.names, 0..) |name, i| {
             const is_selected = (active_idx == i);
-            const panel_id = Vapor.fmtln("tabpanel-{s}", .{name});
-
             Button(switchTabs, .{ tabs, name, active_idx })
-                .a11y(.tab(is_selected, panel_id)) // Add this
+                .id(tabId(tabs, name))
+                .a11y(Vapor.Accessibility.init().setRole(.tab).setSelected(is_selected))
+                .tabIndex(if (is_selected) 0 else -1)
                 .children({
                 trigger_fn(tabs, name, if (active_idx == i) true else false);
             });
@@ -203,13 +176,13 @@ fn NavBtn(ctx: ?*anyopaque) void {
     const i = nav_btn_ctx.i;
 
     const is_selected = (active_idx == i);
-    const panel_id = Vapor.fmtln("tabpanel-{s}", .{name});
-
     Button(switchTabs, .{ tabs, name, active_idx })
-        .a11y(.tab(is_selected, panel_id)) // Add this
-        .background(if (active_idx == i) .transparentizeHex(.palette(.tint), 0.7) else .transparent)
+        .id(tabId(tabs, name))
+        .a11y(Vapor.Accessibility.init().setRole(.tab).setSelected(is_selected))
+        .tabIndex(if (is_selected) 0 else -1)
+        .background(if (active_idx == i) .transparentize(.palette(.tint), 0.7) else .transparent)
         .border(.round(.palette(.tint), .all(4)))
-        .padding(.tblr(4, 4, 8, 8))
+        .padding(.xy(8, 4))
         .children({
         Text(name)
             .fontFamily("IBM Plex Sans,monospace")
@@ -220,9 +193,10 @@ fn NavBtn(ctx: ?*anyopaque) void {
 
 fn Nav(tabs: *Tabs, active_idx: usize) void {
     Box()
-        .a11y(.tabList("Main navigation tabs")) // Add this
+        .a11y(.tabList("Main navigation tabs"))
+        .onEvent(.keydown, navKey, .{tabs})
         .layout(.left_center)
-        .background(.transparentizeHex(.palette(.tint), 0.1))
+        .background(.transparentize(.palette(.tint), 0.1))
         .padding(.all(2))
         .border(.round(.transparent, .all(4)))
         .spacing(12)
@@ -233,6 +207,45 @@ fn Nav(tabs: *Tabs, active_idx: usize) void {
             NavBtn(@ptrCast(@alignCast(ctx)));
         }
     });
+}
+
+/// A tab's element id: unique per Tabs and safe in HTML (names may hold
+/// spaces).
+fn tabId(tabs: *const Tabs, name: []const u8) []const u8 {
+    const prefix = Vapor.fmtln("tab-{x}-", .{@intFromPtr(tabs)});
+    const id = Vapor.frame.arena().alloc(u8, prefix.len + name.len) catch return prefix;
+    @memcpy(id[0..prefix.len], prefix);
+    for (name, id[prefix.len..]) |c, *d| d.* = if (std.ascii.isAlphanumeric(c)) std.ascii.toLower(c) else '-';
+    return id;
+}
+
+/// Left/Right move to the previous/next tab and Home/End to the first/last,
+/// selecting it and taking focus with it (the WAI-ARIA tabs pattern).
+fn navKey(tabs: *Tabs, evt: *Vapor.Event) void {
+    const count = tabs.names.len;
+    if (count == 0) return;
+    const key = evt.key();
+    const current = tabs.selected_index;
+    const next: usize = if (std.mem.eql(u8, key, "ArrowRight"))
+        (current + 1) % count
+    else if (std.mem.eql(u8, key, "ArrowLeft"))
+        (current + count - 1) % count
+    else if (std.mem.eql(u8, key, "Home"))
+        0
+    else if (std.mem.eql(u8, key, "End"))
+        count - 1
+    else
+        return;
+    evt.preventDefault();
+    switchTabs(tabs, tabs.names[next], current);
+    Vapor.onLayout(focusSelected, .{tabs});
+}
+
+/// Focuses whichever tab is selected when it runs: with keys pressed in
+/// quick succession, an earlier call can run after a later one.
+fn focusSelected(tabs: *Tabs) void {
+    if (tabs.selected_index >= tabs.names.len) return;
+    Vapor.lib.focus(tabId(tabs, tabs.names[tabs.selected_index]));
 }
 
 fn switchTabs(tabs: *Tabs, selected_name: []const u8, _: usize) void {

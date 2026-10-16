@@ -11,11 +11,11 @@ const Icon = Vapor.Icon;
 const HooksCtx = Vapor.HooksCtx;
 
 pub var background: Vapor.Types.Color = .palette(.background);
-var border: Vapor.Types.BorderGrouped = .round(.transparentize(.black, 0.2), .all(12));
+var border: Vapor.Types.Border = .round(.transparentize(.black, 0.2), .all(12));
 var group_title_color: Vapor.Types.Color = .hex("#8C8C8C");
 pub var text_color: Vapor.Types.Color = .palette(.text);
-const selected_background: Vapor.Types.Color = .transparentizeHex(.palette(.tint), 0.05);
-const selected_border: Vapor.Types.BorderGrouped = .round(.palette(.tint), .all(12));
+const selected_background: Vapor.Types.Color = .transparentize(.palette(.tint), 0.05);
+const selected_border: Vapor.Types.Border = .round(.palette(.tint), .all(12));
 const tint_color: Vapor.Types.Color = .palette(.tint);
 
 const Position = enum { top, bottom };
@@ -53,7 +53,7 @@ pub fn Select(comptime T: type) type {
         pub const Item = struct {
             value: T,
             label: []const u8,
-            icon: ?Vapor.IconType = null,
+            icon: ?Vapor.IconTokens = null,
             is_selected: bool = false,
             _is_shown: bool = true,
         };
@@ -63,8 +63,13 @@ pub fn Select(comptime T: type) type {
         _selected_item: ?Item = null,
         _selected_index: usize = 0,
         _closed: bool = true,
+        /// Names a trigger whose content has no text (an icon, say) for
+        /// screen readers.
+        trigger_label: ?[]const u8 = null,
+        /// The document keydown listener for Escape, while the list is open.
+        _escape_listener: ?u32 = null,
         _searchable: bool = false,
-        _search_box: Vapor.Binded = .{},
+        _search_box: Vapor.Element = .{},
         ctx: ?*anyopaque = null,
         on_select: ?*const fn (select: *Self, item: *Item) void = null,
         on_select_ctx: ?*const fn (item: *Item, ctx: ?*anyopaque) void = null,
@@ -72,8 +77,8 @@ pub fn Select(comptime T: type) type {
         render_trigger: bool = true,
         _x: f32 = 0,
         _y: f32 = 0,
-        binded: Vapor.Binded = .{},
-        binded_trigger: Vapor.Binded = .{},
+        binded: Vapor.Element = .{},
+        binded_trigger: Vapor.Element = .{},
         on_trigger: ?*const fn (select: *Self, ctx: ?*anyopaque) void = null,
         _did_initialize: bool = false,
         max_height: f32 = 256,
@@ -81,10 +86,10 @@ pub fn Select(comptime T: type) type {
         _position: Position = .bottom,
         total_items: usize = 0,
         tint_color: Vapor.Types.Color = tint_color,
-        border: Vapor.Types.BorderGrouped = .round(.transparentize(.black, 0.2), .all(12)),
-        selected_border: Vapor.Types.BorderGrouped = .round(tint_color, .all(12)),
+        border: Vapor.Types.Border = .round(.transparentize(.black, 0.2), .all(12)),
+        selected_border: Vapor.Types.Border = .round(tint_color, .all(12)),
         // shadow: Vapor.Types.Shadow = .{ .color = .transparentizeHex(tint_color, 0.2), .spread = 3 },
-        shadow: ?Vapor.Types.Shadow = .glow(3, .transparentizeHex(tint_color, 0.2)),
+        shadow: ?Vapor.Types.Shadow = .glow(3, .transparentize(tint_color, 0.2)),
         height: Vapor.Types.Sizing = .px(36),
         arena: std.heap.ArenaAllocator,
         arena_allocator: std.mem.Allocator,
@@ -239,15 +244,15 @@ pub fn Select(comptime T: type) type {
         fn renderItem(select: *Self, item: *Item) void {
             if (!item._is_shown) return;
             Button(selectItem, .{ select, item })
-                .ariaLabel("Select Dropdown")
+                .a11y(Vapor.Accessibility.init().setRole(.option).setSelected(item.is_selected))
                 .width(.percent(100))
                 .height(select.height)
-                .background(if (item.is_selected) .transparentizeHex(select.tint_color, 0.05) else background)
+                .background(if (item.is_selected) .transparentize(select.tint_color, 0.05) else background)
                 .pointer()
                 .layout(.left_center)
                 .duration(100)
-                .hoverBackground(.transparentizeHex(select.tint_color, 0.1))
-                .padding(.tblr(6, 6, 6, 24))
+                .hoverBackground(.transparentize(select.tint_color, 0.1))
+                .padding(.{ .top = 6, .bottom = 6, .left = 6, .right = 24 })
                 .border(.round(.transparent, if (select.border.radius) |radius| radius else .all(8)))
                 .spacing(8)
                 .children({
@@ -318,13 +323,13 @@ pub fn Select(comptime T: type) type {
             select._search_box.focus();
         }
 
-        fn createBindedTrigger(_: *Self) *Vapor.Binded {
-            const binded_trigger: *Vapor.Binded = Vapor.arena(.frame).create(Vapor.Binded) catch unreachable;
+        fn createBindedTrigger(_: *Self) *Vapor.Element {
+            const binded_trigger: *Vapor.Element = Vapor.arena(.frame).create(Vapor.Element) catch unreachable;
             binded_trigger.* = .{};
             return binded_trigger;
         }
 
-        fn toggleWithBindedTrigger(select: *Self, binded_trigger: *Vapor.Binded) void {
+        fn toggleWithBindedTrigger(select: *Self, binded_trigger: *Vapor.Element) void {
             if (select.is_detached) {
                 select.toggle();
                 return;
@@ -341,7 +346,7 @@ pub fn Select(comptime T: type) type {
             select.toggle();
         }
 
-        fn toggleWithBindedTriggerVP(select: *Self, binded_trigger: *Vapor.Binded) void {
+        fn toggleWithBindedTriggerVP(select: *Self, binded_trigger: *Vapor.Element) void {
             if (select.is_detached) {
                 select.toggle();
                 return;
@@ -362,7 +367,7 @@ pub fn Select(comptime T: type) type {
             // Vapor.onLayout(updateBounds, .{ select, binded_trigger });
         }
 
-        fn updateBounds(select: *Self, binded_trigger: *Vapor.Binded) void {
+        fn updateBounds(select: *Self, binded_trigger: *Vapor.Element) void {
             const offsets = binded_trigger.getBoundingClientRect() orelse return;
             const binded = select.binded.getBoundingClientRect() orelse return;
             const width = binded.width;
@@ -376,7 +381,7 @@ pub fn Select(comptime T: type) type {
             Vapor.cycle();
         }
 
-        fn toggleWithBindedTriggerVPCtx(select: *Self, binded_trigger: *Vapor.Binded, callback: anytype, args: anytype) void {
+        fn toggleWithBindedTriggerVPCtx(select: *Self, binded_trigger: *Vapor.Element, callback: anytype, args: anytype) void {
             if (select.is_detached) {
                 select.toggle();
                 return;
@@ -396,7 +401,7 @@ pub fn Select(comptime T: type) type {
                 .ref(binded_trigger).children({
                 if (select.trigger_component) |trigger| {
                     Button(toggleWithBindedTriggerVPCtx, .{ select, binded_trigger, callback, args })
-                        .ariaLabel("Select Dropdown")
+                        .a11y(select.triggerA11y())
                         .background(.transparent)
                         .width(.percent(100))
                         .height(.percent(100))
@@ -405,15 +410,12 @@ pub fn Select(comptime T: type) type {
                     });
                 } else {
                     Button(toggleWithBindedTrigger, .{ select, binded_trigger })
-                        .ariaLabel("Select Dropdown")
+                        .a11y(select.triggerA11y())
                         .width(.percent(100))
                         .border(if (select._closed) border else selected_border)
                         .background(background)
                         .padding(.all(8))
-                        .shadow(.{
-                            .color = if (select._closed) .transparent else .transparentizeHex(select.tint_color, 0.2),
-                            .spread = 3,
-                        })
+                        .shadow(Vapor.Types.Shadow.init().dropSpread(0, 0, 0, 3, if (select._closed) .transparent else .transparentize(select.tint_color, 0.2)))
                         .children({
                         Row()
                             .width(.percent(100))
@@ -442,7 +444,7 @@ pub fn Select(comptime T: type) type {
                     // THIS IS THE NEW WAY i switch toggleWithBindedTriggerVP to toggleWithBindedTrigger
                     ////////////////////////////////////////////////////////////////////////////////////
                     Button(toggleWithBindedTriggerVP, .{ select, binded_trigger })
-                        .ariaLabel("Select Dropdown")
+                        .a11y(select.triggerA11y())
                         .background(.transparent)
                         .width(.percent(100))
                         .height(.percent(100))
@@ -451,7 +453,7 @@ pub fn Select(comptime T: type) type {
                     });
                 } else {
                     Button(toggleWithBindedTrigger, .{ select, binded_trigger })
-                        .ariaLabel("Select Dropdown")
+                        .a11y(select.triggerA11y())
                         .width(.percent(100))
                         .height(select.height)
                         .border(if (select._closed) select.border else select.selected_border)
@@ -494,6 +496,8 @@ pub fn Select(comptime T: type) type {
                 if (!select._closed) {
                     Stack()
                         .onMount(mount, .{select})
+                        .onDestroy(unmount, .{select})
+                        .a11y(.listbox(select.trigger))
                         .transformOrigin(.top_center)
                         .animationEnter("opaque-select-enter")
                         .animationExit("opaque-select-exit")
@@ -501,12 +505,12 @@ pub fn Select(comptime T: type) type {
                         .border(select.border)
                         .background(background)
                         .padding(.all(4))
-                        .shadow(.insetGlow(0, 4, 2, .transparentizeHex(.black, 0.05)))
+                        .shadow(Vapor.Types.Shadow.init().dropSpread(0, 4, 2, 1, .transparentize(.black, 0.05)))
                         .children({
                         Stack()
                             .height(.elastic(select.height.size.min, select.max_height))
                             .width(.percent(100))
-                            .scroll(.scroll_y())
+                            .scroll(.scrollY())
                             .children({
                             for (select.groups.items) |*group| {
                                 select.renderGroup(group);
@@ -539,6 +543,34 @@ pub fn Select(comptime T: type) type {
         fn mount(select: *Self) void {
             const height: f32 = select.height.size.min * @as(f32, @floatFromInt(select._selected_index));
             select.binded.scrollToTop(height);
+            if (select._escape_listener == null) {
+                select._escape_listener = Vapor.lib.addGlobalListenerCtx(.keydown, escapeKey, .{select});
+            }
+        }
+
+        /// The list left the page, however it was closed.
+        fn unmount(select: *Self) void {
+            if (select._escape_listener) |id| {
+                _ = Vapor.lib.removeGlobalListener(.keydown, id);
+                select._escape_listener = null;
+            }
+        }
+
+        fn escapeKey(select: *Self, evt: *Vapor.Event) void {
+            if (std.mem.eql(u8, evt.key(), "Escape")) {
+                evt.preventDefault();
+                select.close();
+            }
+        }
+
+        /// A trigger tells screen readers it opens a listbox, and whether it
+        /// is open; its text (the choice, or the placeholder) names it.
+        fn triggerA11y(select: *Self) Vapor.Accessibility {
+            var a11y = Vapor.Accessibility.init()
+                .setHasPopup(.listbox)
+                .setExpanded(!select._closed);
+            if (select.trigger_label) |label| a11y = a11y.setLabel(label);
+            return a11y;
         }
 
         fn create(select: *Self) void {
@@ -554,7 +586,7 @@ pub fn Select(comptime T: type) type {
         pub fn renderPos(select: *Self, position: Position) void {
             select._position = position;
             if (!select._did_initialize) {
-                Vapor.printErr("Error: Select component not initialized\n Call Select.init(...) or Select.fromItems(...) before rendering", .{});
+                Vapor.print(.err, "Error: Select component not initialized\n Call Select.init(...) or Select.fromItems(...) before rendering", .{});
                 return;
             }
             Stack()
@@ -569,7 +601,7 @@ pub fn Select(comptime T: type) type {
 
         pub fn render(select: *Self) void {
             if (!select._did_initialize) {
-                Vapor.printErr("Error: Select component not initialized\n Call Select.init(...) or Select.fromItems(...) before rendering", .{});
+                Vapor.print(.err, "Error: Select component not initialized\n Call Select.init(...) or Select.fromItems(...) before rendering", .{});
                 return;
             }
             Stack()
@@ -596,7 +628,7 @@ pub fn Select(comptime T: type) type {
                         .border(select.border)
                         .background(background)
                         .padding(.all(4))
-                        .shadow(.insetGlow(0, 4, 2, .transparentizeHex(.black, 0.05)))
+                        .shadow(Vapor.Types.Shadow.init().dropSpread(0, 4, 2, 1, .transparentize(.black, 0.05)))
                         // .{
                         //         .top = 4,
                         //         .spread = 2,
@@ -607,7 +639,7 @@ pub fn Select(comptime T: type) type {
                         Stack()
                             .height(.elastic(36, select.max_height))
                             .width(.percent(100))
-                            .scroll(.scroll_y())
+                            .scroll(.scrollY())
                             .children({
                             component(select);
                         });

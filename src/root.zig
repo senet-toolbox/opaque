@@ -47,6 +47,8 @@ pub const FileUpload = Components.FileUpload;
 pub const OverlayManager = @import("components/OverlayManager.zig");
 pub const Marquee = Components.Marquee;
 pub const Carousel = Components.Carousel;
+pub const Checkbox = Components.Checkbox;
+pub const Radio = Components.Radio;
 
 pub const new = Components.new;
 pub const initAnimations = Components.initAnimations;
