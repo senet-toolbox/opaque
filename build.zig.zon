@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .vapor = .{
-            .url = "https://github.com/senet-toolbox/vapor/archive/refs/tags/v3.1.0.tar.gz",
-            .hash = "vapor-3.1.0-VGoNdfzpEwANQgFjk27hTc5WVg2sMRW6JtUOnWCmjVHz",
+            .url = "https://github.com/senet-toolbox/vapor/archive/refs/tags/v3.1.1.tar.gz",
+            .hash = "vapor-3.1.1-VGoNdYnwEwAoDDctBmqdky3a-6O9NZ4_FBhGUqYWTzEV",
         },
     },
     .paths = .{
