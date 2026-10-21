@@ -628,10 +628,13 @@ pub fn DynamicTable(
         // =================================================================
 
         fn allocBindedCols(table: *Self) []Vapor.Element {
-            return table.arena_allocator.alloc(Vapor.Element, table.table_columns.len) catch |err| blk: {
+            const cols = table.arena_allocator.alloc(Vapor.Element, table.table_columns.len) catch |err| {
                 Vapor.print(.err, "Failed to allocate binded cols: {any}", .{err});
-                break :blk &.{};
+                return &.{};
             };
+            // `ref` reads the elements' fields, so they cannot stay undefined.
+            @memset(cols, Vapor.Element{});
+            return cols;
         }
 
         fn computeRowWidth(table: *Self) f32 {
