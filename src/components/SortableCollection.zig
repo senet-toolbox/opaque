@@ -27,6 +27,7 @@
 //    or maintain id ↔ string conversions.
 
 const std = @import("std");
+const is_wasm = @import("builtin").target.cpu.arch == .wasm32;
 const Vapor = @import("vapor");
 const drag_context = @import("DragContext.zig");
 
@@ -999,7 +1000,7 @@ pub fn Collection(
             if (!self.auto_scroll_active) return;
             self.auto_scroll_active = false;
             self.auto_scroll_speed = 0;
-            if (self.auto_scroll_raf_id != 0) {
+            if (is_wasm and self.auto_scroll_raf_id != 0) {
                 Vapor.Wasm.cancelAnimationFrameWasm(self.auto_scroll_raf_id);
                 self.auto_scroll_raf_id = 0;
             }
@@ -1051,7 +1052,7 @@ pub fn Collection(
 
         fn releaseCaptureIfHeld(self: *Self, _: *Vapor.Event) void {
             const slot_index = self.captured_slot_index orelse return;
-            if (slot_index < self.slots.items.len) {
+            if (is_wasm and slot_index < self.slots.items.len) {
                 // self.slots.items[slot_index].binded.releasePointerCapture(self.captured_pointer_id);
                 const id = self.slots.items[slot_index].binded._get_id() orelse {
                     std.log.info("SortableCollection Slot Id is null", .{});
