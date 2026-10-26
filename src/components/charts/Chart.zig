@@ -305,8 +305,8 @@ pub const Chart = struct {
         if (!Vapor.lib.isWasi) return bounds;
         bounds.x = @floatFromInt(config.margin.left);
         bounds.y = @floatFromInt(config.margin.top);
-        bounds.width = @floatFromInt(config.width - config.margin.left - config.margin.right);
-        bounds.height = @floatFromInt(config.height - config.margin.top - config.margin.bottom);
+        bounds.width = @floatFromInt(config.width -| config.margin.left -| config.margin.right);
+        bounds.height = @floatFromInt(config.height -| config.margin.top -| config.margin.bottom);
         return bounds;
     }
 
@@ -523,8 +523,8 @@ pub const Chart = struct {
         errdefer svg.deinit();
 
         const m = self.config.margin;
-        const chart_width: f64 = @floatFromInt(self.config.width - m.left - m.right);
-        const chart_height: f64 = @floatFromInt(self.config.height - m.top - m.bottom);
+        const chart_width: f64 = @floatFromInt(self.config.width -| m.left -| m.right);
+        const chart_height: f64 = @floatFromInt(self.config.height -| m.top -| m.bottom);
 
         // Analyze series types
         var has_bars = false;
@@ -1439,14 +1439,14 @@ pub const Chart = struct {
         const start_x: f64 = switch (cfg.position) {
             .top_left, .bottom_left => @floatFromInt(m.left + 10),
             .top_right, .bottom_right => switch (cfg.direction) {
-                .column => @floatFromInt(self.config.width - m.right - 100),
-                .row => @as(f64, @floatFromInt(self.config.width - m.right)) - (@as(f64, @floatFromInt(total_items)) * item_width),
+                .column => @floatFromInt(self.config.width -| m.right -| 100),
+                .row => @as(f64, @floatFromInt(self.config.width -| m.right)) - (@as(f64, @floatFromInt(total_items)) * item_width),
             },
         };
 
         const start_y: f64 = switch (cfg.position) {
             .top_left, .top_right => @floatFromInt(m.top),
-            .bottom_left, .bottom_right => @floatFromInt(self.config.height - m.bottom - 20),
+            .bottom_left, .bottom_right => @floatFromInt(self.config.height -| m.bottom -| 20),
         };
 
         var current_x = start_x;
@@ -1974,7 +1974,7 @@ pub const Chart = struct {
                                 .duration = 50,
                                 .timing = .ease,
                             })
-                            .height(.px(@floatFromInt(self.config.height - self.config.margin.bottom - self.config.margin.top)))
+                            .height(.px(@floatFromInt(self.config.height -| self.config.margin.bottom -| self.config.margin.top)))
                             .background(.palette(.text_color))
                             .children({});
                     }
@@ -2071,8 +2071,8 @@ pub const Chart = struct {
                     if (self.config.show_bottom_line) {
                         const x_axis_config = self.x_axis_config orelse AxisConfig{};
                         Box()
-                            .pos(.tl(.px(@floatFromInt(self.config.height - self.config.margin.bottom)), .px(@floatFromInt(self.config.margin.left)), .absolute))
-                            .width(.px(@floatFromInt(self.config.width - self.config.margin.left - self.config.margin.right)))
+                            .pos(.tl(.px(@floatFromInt(self.config.height -| self.config.margin.bottom)), .px(@floatFromInt(self.config.margin.left)), .absolute))
+                            .width(.px(@floatFromInt(self.config.width -| self.config.margin.left -| self.config.margin.right)))
                             .height(.px(1))
                             .background(x_axis_config.color)
                             .children({});
