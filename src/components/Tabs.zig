@@ -192,9 +192,12 @@ fn NavBtn(ctx: ?*anyopaque) void {
 }
 
 fn Nav(tabs: *Tabs, active_idx: usize) void {
+    // Tabs that do not fit scroll sideways instead of widening the page.
     Box()
         .a11y(.tabList("Main navigation tabs"))
         .onEvent(.keydown, navKey, .{tabs})
+        .inlineStyle("max-width: 100%;", .{})
+        .scroll(.scrollX())
         .layout(.left_center)
         .background(.transparentize(.palette(.tint), 0.1))
         .padding(.all(2))

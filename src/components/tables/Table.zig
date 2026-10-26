@@ -1711,10 +1711,14 @@ pub fn Table(
                 .onDestroy(destroy, .{table})
                 .onResize(calcBounds, .{table})
                 .width(.expand)
+                .inlineStyle("max-width: 100%;", .{})
                 .ref(&table.container)
                 .height(.expand)
                 .children({
+                // As wide as the container: rows wider than it scroll inside
+                // instead of widening the page.
                 Stack()
+                    .width(.percent(100))
                     .height(height)
                     .scroll(.{ .y = .hidden, .x = .scroll })
                     .a11y(Vapor.Accessibility.init()

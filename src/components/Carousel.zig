@@ -206,8 +206,11 @@ pub fn render(options: Options) *Carousel {
 
     const initial_offset = currentOffset(c);
 
+    // Never wider than its container: on a narrow screen the slide is
+    // cropped instead of widening the page.
     c.container = Stack()
         .width(.px(options.viewport_width))
+        .inlineStyle("max-width: 100%;", .{})
         .direction(.column)
         .spacing(12);
 
@@ -222,7 +225,7 @@ pub fn render(options: Options) *Carousel {
         .scroll(.none())
         .pos(.relative)
         .createDraggable(&c.draggable)
-        .inlineStyle("touch-action: pan-y; cursor: grab; user-select: none; overflow: hidden;", .{});
+        .inlineStyle("touch-action: pan-y; cursor: grab; user-select: none; overflow: hidden; max-width: 100%;", .{});
 
     // Open track inside viewport — this is what the user's slides land in
     c.track_row = Row()
