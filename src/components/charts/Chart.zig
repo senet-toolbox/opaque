@@ -1431,16 +1431,21 @@ pub const Chart = struct {
         const cfg = self.legend_config orelse return;
         const m = self.config.margin;
 
-        // Calculate total items for row layout width estimation
-        const total_items = self.series.items.len + cfg.fields.len;
-        const item_width: f64 = 80; // Approximate width per legend item (for row layout)
+        // A row's items are as wide as their text, and the row stays over
+        // the plot: right-aligned when it fits, else from the left edge,
+        // wrapping onto further lines.
+        const left: f64 = @floatFromInt(m.left);
+        const right: f64 = @floatFromInt(self.config.width -| m.right);
+        var row_width: f64 = 0;
+        for (self.series.items) |s| row_width += legendItemWidth(s.name);
+        for (cfg.fields) |f| row_width += legendItemWidth(f.title);
 
         // Starting position based on position config
         const start_x: f64 = switch (cfg.position) {
-            .top_left, .bottom_left => @floatFromInt(m.left + 10),
+            .top_left, .bottom_left => left + 10,
             .top_right, .bottom_right => switch (cfg.direction) {
-                .column => @floatFromInt(self.config.width -| m.right -| 100),
-                .row => @as(f64, @floatFromInt(self.config.width -| m.right)) - (@as(f64, @floatFromInt(total_items)) * item_width),
+                .column => @max(left, right - 100),
+                .row => @max(left, right - row_width),
             },
         };
 
@@ -1454,6 +1459,7 @@ pub const Chart = struct {
 
         // Render series legends
         for (self.series.items, 0..) |s, i| {
+            if (cfg.direction == .row) wrapLegend(&current_x, &current_y, s.name, start_x, right, cfg.spacing);
             const series_color = s.options.color orelse Vapor.Types.Color.hex(self.config.palette.get(i));
 
             var id_buf: [64]u8 = undefined;
@@ -1470,12 +1476,13 @@ pub const Chart = struct {
             // Advance position based on direction
             switch (cfg.direction) {
                 .column => current_y += cfg.spacing,
-                .row => current_x += item_width,
+                .row => current_x += legendItemWidth(s.name),
             }
         }
 
         // Render custom field legends
         for (cfg.fields, self.series.items.len..) |f, i| {
+            if (cfg.direction == .row) wrapLegend(&current_x, &current_y, f.title, start_x, right, cfg.spacing);
             const series_color = f.color;
 
             var id_buf: [64]u8 = undefined;
@@ -1492,8 +1499,23 @@ pub const Chart = struct {
             // Advance position based on direction
             switch (cfg.direction) {
                 .column => current_y += cfg.spacing,
-                .row => current_x += item_width,
+                .row => current_x += legendItemWidth(f.title),
             }
+        }
+    }
+
+    /// A row legend item's width: its swatch, the gap after it, its text at
+    /// the legend's 11px (about 6.5px a character) and the gap to the next.
+    fn legendItemWidth(title: []const u8) f64 {
+        return 18 + @as(f64, @floatFromInt(title.len)) * 6.5 + 16;
+    }
+
+    /// Moves a row legend's next item onto a new line when it would cross
+    /// the plot's right edge, unless it is the first on its line.
+    fn wrapLegend(x: *f64, y: *f64, title: []const u8, line_start: f64, right: f64, spacing: f64) void {
+        if (x.* > line_start and x.* + legendItemWidth(title) - 16 > right) {
+            x.* = line_start;
+            y.* += spacing;
         }
     }
 
