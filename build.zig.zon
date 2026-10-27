@@ -2,11 +2,11 @@
     .name = .opaque_ui,
     .version = "0.0.0",
     .fingerprint = 0x18300732840bda52, // Changing this has security and trust implications.
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .vapor = .{
-            .url = "https://github.com/senet-toolbox/vapor/archive/refs/tags/v3.1.1.tar.gz",
-            .hash = "vapor-3.1.1-VGoNdYnwEwAoDDctBmqdky3a-6O9NZ4_FBhGUqYWTzEV",
+            .url = "https://github.com/senet-toolbox/vapor/archive/refs/tags/v3.5.2.tar.gz",
+            .hash = "vapor-3.5.2-VGoNddqMFABReKGR2dzuF7GjK3Dq_Ip2WzBWfl_k8NEd",
         },
     },
     .paths = .{
