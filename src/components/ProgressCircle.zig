@@ -33,8 +33,19 @@ pub const ProgressCircle = struct {
     progress: f64 = 0, // 0.0 to 1.0
     current_svg: ?[]const u8 = null,
     platform: Platform,
+    /// Its number in creation order, for its element ids when `config.id`
+    /// is not set.
+    seq: u32 = 0,
+
+    /// Circles created so far.
+    var created: u32 = 0;
 
     pub const Config = struct {
+        /// Ends its element ids ("progress-<id>"). Unset, it is the circle's
+        /// number in creation order, which is the same in a prerendered page
+        /// and in the app as long as both create their circles in the same
+        /// order.
+        id: ?[]const u8 = null,
         size: u32 = 120,
         stroke_width: f32 = 10,
         color: ?Vapor.Types.Color = .hex("#3b82f6"),
@@ -121,11 +132,19 @@ pub const ProgressCircle = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator, config: Config) ProgressCircle {
+        created += 1;
         return .{
             .allocator = allocator,
             .config = config,
             .platform = .{ .browser = .{} },
+            .seq = created,
         };
+    }
+
+    /// What its element ids end in: `config.id`, else its number, written
+    /// into `buf` (it can run before the app has a frame to format into).
+    fn idSuffix(self: *const ProgressCircle, buf: *[10]u8) []const u8 {
+        return self.config.id orelse std.fmt.bufPrint(buf, "{d}", .{self.seq}) catch unreachable;
     }
 
     pub fn deinit(self: *ProgressCircle) void {
@@ -197,10 +216,9 @@ pub const ProgressCircle = struct {
 
     pub fn updateProgress(self: *ProgressCircle, value: f64) void {
         self.progress = std.math.clamp(value, 0.0, 1.0);
-        var id_buf: [512]u8 = undefined;
-        const id_suffix = std.fmt.bufPrint(&id_buf, "progress-fill-{x}", .{@intFromPtr(self)}) catch unreachable;
-        var id_buf_text: [512]u8 = undefined;
-        const text_suffix = std.fmt.bufPrint(&id_buf_text, "progress-label-{x}", .{@intFromPtr(self)}) catch unreachable;
+        var suffix_buf: [10]u8 = undefined;
+        const id_suffix = Vapor.fmtln("progress-fill-{s}", .{self.idSuffix(&suffix_buf)});
+        const text_suffix = Vapor.fmtln("progress-label-{s}", .{self.idSuffix(&suffix_buf)});
 
         const size = self.config.size;
         const stroke_width = self.config.stroke_width;
@@ -220,7 +238,8 @@ pub const ProgressCircle = struct {
     }
 
     fn elementId(self: *const ProgressCircle) []const u8 {
-        return Vapor.fmtln("progress-{x}", .{@intFromPtr(self)});
+        var suffix_buf: [10]u8 = undefined;
+        return Vapor.fmtln("progress-{s}", .{self.idSuffix(&suffix_buf)});
     }
 
     pub fn rebuild(self: *ProgressCircle) void {
@@ -292,9 +311,9 @@ pub const ProgressCircle = struct {
     /// Build the SVG
     pub fn build(self: *ProgressCircle) !void {
         if (!Vapor.lib.isWasi) return;
+        var suffix_buf: [10]u8 = undefined;
 
-        var id_buf: [20]u8 = undefined;
-        const id_suffix = try std.fmt.bufPrint(&id_buf, "{x}", .{@intFromPtr(self)});
+        const id_suffix = self.idSuffix(&suffix_buf);
 
         const size = self.config.size;
         const stroke_width = self.config.stroke_width;

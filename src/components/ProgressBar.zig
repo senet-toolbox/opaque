@@ -22,8 +22,18 @@ pub const ProgressBar = struct {
     progress: f64 = 0, // 0.0 to 1.0
     current_svg: ?[]const u8 = null,
     platform: Platform,
+    /// Its number in creation order, for its element ids when `config.id`
+    /// is not set.
+    seq: u32 = 0,
+
+    /// Bars created so far.
+    var created: u32 = 0;
 
     pub const Config = struct {
+        /// Ends its element ids ("bar-<id>"). Unset, it is the bar's number
+        /// in creation order, which is the same in a prerendered page and in
+        /// the app as long as both create their bars in the same order.
+        id: ?[]const u8 = null,
         width: u32 = 200,
         height: u32 = 20,
         color: Vapor.Types.Color = .hex("#3b82f6"),
@@ -73,11 +83,19 @@ pub const ProgressBar = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator, config: Config) ProgressBar {
+        created += 1;
         return .{
             .allocator = allocator,
             .config = config,
             .platform = Platform.browser,
+            .seq = created,
         };
+    }
+
+    /// What its element ids end in: `config.id`, else its number, written
+    /// into `buf` (it can run before the app has a frame to format into).
+    fn idSuffix(self: *const ProgressBar, buf: *[10]u8) []const u8 {
+        return self.config.id orelse std.fmt.bufPrint(buf, "{d}", .{self.seq}) catch unreachable;
     }
 
     pub fn deinit(self: *ProgressBar) void {
@@ -94,9 +112,9 @@ pub const ProgressBar = struct {
 
     pub fn updateProgress(self: *ProgressBar, value: f64) void {
         self.progress = std.math.clamp(value, 0.0, 1.0);
-        var id_buf: [512]u8 = undefined;
-        const id_suffix = std.fmt.bufPrint(&id_buf, "bar-fill-{x}", .{@intFromPtr(self)}) catch unreachable;
-        const text_suffix = Vapor.fmtln("bar-label-{x}", .{@intFromPtr(self)});
+        var suffix_buf: [10]u8 = undefined;
+        const id_suffix = Vapor.fmtln("bar-fill-{s}", .{self.idSuffix(&suffix_buf)});
+        const text_suffix = Vapor.fmtln("bar-label-{s}", .{self.idSuffix(&suffix_buf)});
 
         const width = self.config.width;
 
@@ -113,7 +131,8 @@ pub const ProgressBar = struct {
     }
 
     fn elementId(self: *const ProgressBar) []const u8 {
-        return Vapor.fmtln("bar-{x}", .{@intFromPtr(self)});
+        var suffix_buf: [10]u8 = undefined;
+        return Vapor.fmtln("bar-{s}", .{self.idSuffix(&suffix_buf)});
     }
 
     pub fn rebuild(self: *ProgressBar) void {
@@ -132,9 +151,9 @@ pub const ProgressBar = struct {
     /// Build the SVG
     pub fn build(self: *ProgressBar) !void {
         if (!Vapor.lib.isWasi) return;
+        var suffix_buf: [10]u8 = undefined;
 
-        var id_buf: [20]u8 = undefined;
-        const id_suffix = try std.fmt.bufPrint(&id_buf, "{x}", .{@intFromPtr(self)});
+        const id_suffix = self.idSuffix(&suffix_buf);
 
         const width = self.config.width;
         const height = self.config.height;

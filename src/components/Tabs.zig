@@ -12,6 +12,8 @@ const Tooltip = Opaque.Tooltip;
 var peristant_tabs: std.StringHashMap(*Tabs) = undefined;
 
 const Tabs = @This();
+/// The name these tabs are kept under; their element ids start with it.
+tag: []const u8 = "",
 active_tab: ?[]const u8 = null,
 names: []const []const u8,
 on_click: ?*const fn (*Tabs) void = null,
@@ -49,6 +51,7 @@ pub fn NavBar(tag: []const u8, names: []const []const u8) usize {
     const tabs = peristant_tabs.get(tag) orelse blk: {
         const t = Vapor.arena(.persist).create(Tabs) catch unreachable;
         t.* = .{
+            .tag = tag,
             .names = names,
         }; // Initialize list
         peristant_tabs.put(tag, t) catch unreachable;
@@ -80,6 +83,7 @@ pub fn create(tag: []const u8, names: []const []const u8) *Tabs {
     const tabs = peristant_tabs.get(tag) orelse blk: {
         const t = Vapor.arena(.persist).create(Tabs) catch unreachable;
         t.* = .{
+            .tag = tag,
             .names = names,
         }; // Initialize list
         peristant_tabs.put(tag, t) catch unreachable;
@@ -212,14 +216,15 @@ fn Nav(tabs: *Tabs, active_idx: usize) void {
     });
 }
 
-/// A tab's element id: unique per Tabs and safe in HTML (names may hold
-/// spaces).
+/// A tab's element id, "tab-<tag>-<name>": unique per Tabs, the same in a
+/// prerendered page and in the app, and safe in HTML (names may hold spaces).
 fn tabId(tabs: *const Tabs, name: []const u8) []const u8 {
-    const prefix = Vapor.fmtln("tab-{x}-", .{@intFromPtr(tabs)});
-    const id = Vapor.frame.arena().alloc(u8, prefix.len + name.len) catch return prefix;
-    @memcpy(id[0..prefix.len], prefix);
-    for (name, id[prefix.len..]) |c, *d| d.* = if (std.ascii.isAlphanumeric(c)) std.ascii.toLower(c) else '-';
-    return id;
+    const id = Vapor.fmtln("tab-{s}-{s}", .{ tabs.tag, name });
+    const safe = Vapor.frame.arena().dupe(u8, id) catch return id;
+    for (safe[4..]) |*c| {
+        if (!std.ascii.isAlphanumeric(c.*)) c.* = '-' else c.* = std.ascii.toLower(c.*);
+    }
+    return safe;
 }
 
 /// Left/Right move to the previous/next tab and Home/End to the first/last,
