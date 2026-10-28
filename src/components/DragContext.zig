@@ -22,6 +22,7 @@
 const std = @import("std");
 const Vapor = @import("vapor");
 const FractionalIndex = @import("FractionalIndex.zig");
+const is_wasm = @import("builtin").target.cpu.arch == .wasm32;
 
 // ============================================================================
 // Shared (non-generic) types
@@ -159,11 +160,19 @@ pub fn DragContext(comptime IdType: type) type {
         active_drag: ?ActiveDrag = null,
         move_listener_id: ?u32 = null,
         up_listener_id: ?u32 = null,
+        cancel_listener_id: ?u32 = null,
         animations_enabled: bool = true,
         overlay_state: DragOverlayState = .{},
 
         shared_filter: ?ErasedFilter = null,
         filter_generation: u64 = 0,
+
+        /// A container that scrolls sideways, such as a board of columns:
+        /// dragging near its left or right edge scrolls it, so columns off
+        /// screen can be reached. Set with `setScrollContainer`.
+        scroll_container: ?*Vapor.Element = null,
+        edge_scroll_speed: f32 = 0,
+        edge_scroll_raf_id: u32 = 0,
 
         // ====================================================================
         // Lifecycle
@@ -227,6 +236,69 @@ pub fn DragContext(comptime IdType: type) type {
 
             self.move_listener_id = Vapor.addGlobalListenerCtx(.pointermove, handlePointerMove, .{self}) orelse null;
             self.up_listener_id = Vapor.addGlobalListenerCtx(.pointerup, handlePointerUp, .{self}) orelse null;
+            self.cancel_listener_id = Vapor.addGlobalListenerCtx(.pointercancel, handlePointerCancel, .{self}) orelse null;
+        }
+
+        /// The browser took the pointer (a touch became a scroll, say): the
+        /// item goes back where it was.
+        fn handlePointerCancel(self: *Self, _: *Vapor.Event) void {
+            self.cleanup();
+            Vapor.cycle();
+        }
+
+        /// See `scroll_container`. `null` turns edge scrolling off.
+        pub fn setScrollContainer(self: *Self, element: ?*Vapor.Element) void {
+            self.scroll_container = element;
+        }
+
+        /// Scrolls `scroll_container` while the pointer is near its left or
+        /// right edge, faster the nearer it is.
+        fn checkEdgeScroll(self: *Self, px: f32) void {
+            const element = self.scroll_container orelse return;
+            const bounds = element.getBoundingClientRect() orelse return self.stopEdgeScroll();
+            const zone = @min(64, bounds.width / 4);
+            const from_left = px - bounds.left;
+            const from_right = bounds.right - px;
+            const speed: f32 = if (from_left < zone)
+                -edgeSpeed(from_left, zone)
+            else if (from_right < zone)
+                edgeSpeed(from_right, zone)
+            else
+                0;
+            if (speed == 0) return self.stopEdgeScroll();
+            self.edge_scroll_speed = speed;
+            if (self.edge_scroll_raf_id == 0) {
+                self.edge_scroll_raf_id = Vapor.lib.runOnAnimationFrame(edgeScrollTick, .{self});
+            }
+        }
+
+        fn edgeSpeed(distance: f32, zone: f32) f32 {
+            const depth = std.math.clamp(1 - distance / zone, 0, 1);
+            return 4 + 12 * depth;
+        }
+
+        fn edgeScrollTick(self: *Self) void {
+            self.edge_scroll_raf_id = 0;
+            if (self.edge_scroll_speed == 0 or !self.isDragActive()) return self.stopEdgeScroll();
+            const element = self.scroll_container orelse return self.stopEdgeScroll();
+            const current: f32 = @floatFromInt(element.getAttributeNumber("scrollLeft"));
+            const max: f32 = @floatFromInt(element.getAttributeNumber("scrollWidth") -| element.getAttributeNumber("clientWidth"));
+            const next = std.math.clamp(current + self.edge_scroll_speed, 0, max);
+            if (next != current) {
+                element.scrollLeft(@intFromFloat(next));
+                // The columns moved under the pointer.
+                self.refreshHover();
+                Vapor.cycle();
+            }
+            self.edge_scroll_raf_id = Vapor.lib.runOnAnimationFrame(edgeScrollTick, .{self});
+        }
+
+        fn stopEdgeScroll(self: *Self) void {
+            self.edge_scroll_speed = 0;
+            if (is_wasm and self.edge_scroll_raf_id != 0) {
+                Vapor.Wasm.cancelAnimationFrameWasm(self.edge_scroll_raf_id);
+            }
+            self.edge_scroll_raf_id = 0;
         }
 
         fn handlePointerMove(self: *Self, evt: *Vapor.Event) void {
@@ -266,6 +338,7 @@ pub fn DragContext(comptime IdType: type) type {
 
             // NEW: let the hovered collection update its auto-scroll state.
             self.dispatchAutoScroll(px, py);
+            self.checkEdgeScroll(px);
 
             Vapor.cycle();
         }
@@ -381,6 +454,11 @@ pub fn DragContext(comptime IdType: type) type {
                 _ = Vapor.removeGlobalListener(.pointerup, id);
                 self.up_listener_id = null;
             }
+            if (self.cancel_listener_id) |id| {
+                _ = Vapor.removeGlobalListener(.pointercancel, id);
+                self.cancel_listener_id = null;
+            }
+            self.stopEdgeScroll();
 
             if (self.collections) |collections| {
                 var iter = collections.valueIterator();
@@ -414,6 +492,24 @@ pub fn DragContext(comptime IdType: type) type {
                 const handle = handle_ptr.*;
                 if (handle.container_rect) |cr| {
                     if (cr.containsPoint(px, py)) {
+                        hit_collection = handle;
+                        break;
+                    }
+                }
+            }
+
+            // Below a short list (or above it) the pointer is still in its
+            // column: a drop there goes to the list's end (or start).
+            if (hit_collection == null) {
+                var column_iter = collections.valueIterator();
+                while (column_iter.next()) |handle_ptr| {
+                    const handle = handle_ptr.*;
+                    const cr = handle.container_rect orelse continue;
+                    const in_column = switch (handle.direction) {
+                        .vertical => px >= cr.left and px <= cr.right,
+                        .horizontal => py >= cr.top and py <= cr.bottom,
+                    };
+                    if (in_column) {
                         hit_collection = handle;
                         break;
                     }

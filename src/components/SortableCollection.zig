@@ -99,6 +99,12 @@ pub fn CollectionConfig(comptime T: type, comptime IdType: type) type {
         // because they don't move the pointer.
         drag_activation_distance: f32 = 5,
 
+        // Touch: a finger resting on an item this long picks it up; until
+        // then, moving more than `touch_tolerance` pixels is a scroll, as a
+        // swipe should be.
+        touch_hold_ms: u32 = 250,
+        touch_tolerance: f32 = 8,
+
         // Optional predicate. Return false to prevent drag from
         // starting on this pointerdown (e.g. when target is a button).
         // Receives the event so you can inspect target/tag/role.
@@ -235,7 +241,15 @@ pub fn Collection(
             start_x: f32,
             start_y: f32,
             initial_rect: ?drag_context.Rect,
+            /// A finger, which picks the item up by resting on it.
+            touch: bool = false,
+            /// The finger has rested long enough: the next move drags.
+            held: bool = false,
         };
+
+        /// One finger at a time, so one long-press timer serves every
+        /// collection.
+        const touch_hold_timer = "opaque-sortable-touch-hold";
 
         // ====================================================================
         // Initialization
@@ -881,13 +895,50 @@ pub fn Collection(
                 };
             }
 
+            const touch = isTouch(evt);
             self.pending_drag = .{
                 .real_index = real_index,
                 .local_index = local_index,
                 .start_x = px,
                 .start_y = py,
                 .initial_rect = initial_rect,
+                .touch = touch,
             };
+            if (touch) Vapor.timeout(touch_hold_timer, config.touch_hold_ms, holdTouch, .{self});
+        }
+
+        fn isTouch(evt: *Vapor.Event) bool {
+            const name: []const u8 = "pointerType";
+            return std.mem.eql(u8, std.mem.span(Vapor.Event.getEventData(evt.id, name.ptr, name.len)), "touch");
+        }
+
+        /// The finger rested on the item: pick it up. The timeout rerenders,
+        /// which lifts the item.
+        fn holdTouch(self: *Self) void {
+            if (self.pending_drag) |*pending| {
+                if (pending.touch) pending.held = true;
+            }
+        }
+
+        /// Forgets a press that never became a drag. A held item drops back.
+        fn dropPending(self: *Self) void {
+            const pending = self.pending_drag orelse return;
+            self.pending_drag = null;
+            if (pending.touch) Vapor.lib.cancelTimeout(touch_hold_timer);
+            if (pending.held) Vapor.cycle();
+        }
+
+        /// Whether a finger on an item should move it rather than scroll.
+        fn holdsTouch(self: *const Self) bool {
+            if (self.pending_drag) |pending| return pending.held;
+            const ctx = self.drag_ctx orelse return false;
+            return ctx.active_drag != null;
+        }
+
+        /// A finger holding an item drags it: the page must not scroll. Only
+        /// a touchmove can stop that, and only from a listener on an element.
+        fn handleItemTouchMove(self: *Self, evt: *Vapor.Event) void {
+            if (self.holdsTouch()) evt.preventDefault();
         }
 
         fn checkAutoScroll(self: *Self, px: f32, py: f32) void {
@@ -1012,10 +1063,17 @@ pub fn Collection(
             const dx = evt.clientX() - pending.start_x;
             const dy = evt.clientY() - pending.start_y;
             const dist_sq = dx * dx + dy * dy;
-            const threshold = config.drag_activation_distance;
-            const threshold_sq = threshold * threshold;
 
-            if (dist_sq < threshold_sq) return;
+            if (pending.touch and !pending.held) {
+                // Moving before the hold is a scroll; the browser takes it.
+                const tolerance = config.touch_tolerance;
+                if (dist_sq > tolerance * tolerance) self.dropPending();
+                return;
+            }
+
+            // A held item drags with any move; a mouse past the threshold.
+            const threshold = if (pending.touch) 0 else config.drag_activation_distance;
+            if (dist_sq < threshold * threshold) return;
 
             // Threshold crossed — promote pending pointerdown into a real drag.
             self.pending_drag = null;
@@ -1042,7 +1100,7 @@ pub fn Collection(
             // Released without crossing threshold — it was a click. Clear pending
             // state and let the click event fire normally on the actual target.
             if (self.pending_drag != null) {
-                self.pending_drag = null;
+                self.dropPending();
                 return;
             }
 
@@ -1247,6 +1305,10 @@ pub fn Collection(
 
                                 const is_this_item_dragging = is_dragging_from_here and
                                     (drag_source_index orelse std.math.maxInt(usize)) == real_i;
+                                const is_this_item_held = if (self.pending_drag) |pending|
+                                    pending.held and pending.real_index == real_i
+                                else
+                                    false;
 
                                 if (!is_this_item_dragging and !self.passesFilter(item)) {
                                     continue;
@@ -1284,11 +1346,19 @@ pub fn Collection(
                                     .width(.percent(100))
                                     .ref(&slot.binded)
                                     .pos(.{ .type = .absolute, .top = .px(0), .left = .px(0) })
-                                    .inlineStyle("transform: translate3d({d}px, {d}px, {d}px);", .{ 0, y_pos, 0 })
+                                    // A held item lifts. A long press neither selects
+                                    // text nor opens the phone's menu.
+                                    .inlineStyle(
+                                        "transform: translate3d(0px, {d}px, 0px) scale({d}); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;",
+                                        .{ y_pos, @as(f32, if (is_this_item_held) 1.03 else 1) },
+                                    )
+                                    // Its handlers rerender when they change something.
+                                    .cycle(false)
                                     .onEvent(.pointerdown, handlePointerDownDispatch, .{ self, local_i })
                                     .onEvent(.pointermove, handlePointerMoveDispatch, .{self})
                                     .onEvent(.pointerup, handlePointerUpDispatch, .{self})
                                     .onEvent(.pointercancel, handlePointerUpDispatch, .{self})
+                                    .onEvent(.touchmove, handleItemTouchMoveDispatch, .{self})
                                     .cursor(if (is_this_item_dragging) .grabbing else .grab)
                                     .opacity(if (is_this_item_dragging) 0.3 else 1.0)
                                     .children({
@@ -1383,6 +1453,10 @@ pub fn Collection(
 
         fn handlePointerUpDispatch(self: *Self, evt: *Vapor.Event) void {
             self.handleItemPointerUp(evt);
+        }
+
+        fn handleItemTouchMoveDispatch(self: *Self, evt: *Vapor.Event) void {
+            self.handleItemTouchMove(evt);
         }
 
         fn renderNoItems(collection_count: usize, comptime dir: Direction) void {
