@@ -298,14 +298,13 @@ fn getFieldTypeFromValue(field_value: FieldValue) FieldType {
 fn ErasedField() Vapor.TextFieldBuilder(.pure) {
     return TextArea()
         .height(.elastic(36, 256))
-        .font(14, 300, null)
         .padding(.xy(12, 8))
         .resize(.none)
         .inlineStyle("field-sizing: content;", .{})
         .outline(.none, null)
         .background(.transparent)
         .fontFamily("Montserrat")
-        .font(14, 300, .black);
+        .font(14, 300, .palette(.text));
 }
 
 fn destroy(stable_id: []const u8) void {
