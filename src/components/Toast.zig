@@ -39,31 +39,45 @@ pub var stack_position: StackPosition = .top_right;
 pub var toasts: Vapor.Array(Toast) = undefined;
 pub var border_thickness: u8 = 1;
 pub var border_radius: Vapor.Types.BorderRadius = .all(16);
-pub var border_color: Vapor.Types.Color = .white;
-pub var background: Vapor.Types.Color = .transparentize(.white, 0.2);
+
+// Every toast's colours. They follow the theme, so toasts are light in a
+// light theme and dark in a dark one.
+pub var background: Vapor.Types.Color = .palette(.background);
+pub var text_color: Vapor.Types.Color = .palette(.text);
+pub var border_color: Vapor.Types.Color = .palette(.border_color_light);
 pub var shadow: Vapor.Types.Shadow = Vapor.Types.Shadow.init().dropSpread(0, 2, 8, 0, .transparentize(.black, 0.15));
 
-pub var success_background: Vapor.Types.Color = .transparentize(.white, 0.2);
-pub var err_background: Vapor.Types.Color = .transparentize(.white, 0.2);
-pub var warning_background: Vapor.Types.Color = .transparentize(.white, 0.2);
-pub var info_background: Vapor.Types.Color = .transparentize(.white, 0.2);
+// One type's colours, over the ones above; null keeps those.
+pub var success_background: ?Vapor.Types.Color = null;
+pub var err_background: ?Vapor.Types.Color = null;
+pub var warning_background: ?Vapor.Types.Color = null;
+pub var info_background: ?Vapor.Types.Color = null;
 
-pub var success_text_color: Vapor.Types.Color = .black;
-pub var err_text_color: Vapor.Types.Color = .black;
-pub var warning_text_color: Vapor.Types.Color = .black;
-pub var info_text_color: Vapor.Types.Color = .black;
+pub var success_text_color: ?Vapor.Types.Color = null;
+pub var err_text_color: ?Vapor.Types.Color = null;
+pub var warning_text_color: ?Vapor.Types.Color = null;
+pub var info_text_color: ?Vapor.Types.Color = null;
 
-pub var success_blur: u8 = 12;
-pub var err_blur: u8 = 12;
-pub var warning_blur: u8 = 12;
-pub var info_blur: u8 = 12;
+/// The colour of a type's icon, which tells the types apart.
+pub var success_icon_color: Vapor.Types.Color = .hex("#22c55e");
+pub var err_icon_color: Vapor.Types.Color = .hex("#ef4444");
+pub var warning_icon_color: Vapor.Types.Color = .hex("#f59e0b");
+pub var info_icon_color: Vapor.Types.Color = .palette(.tint);
+
+/// Blurs the page behind a type's toast, for a see-through `background`.
+pub var success_blur: u8 = 0;
+pub var err_blur: u8 = 0;
+pub var warning_blur: u8 = 0;
+pub var info_blur: u8 = 0;
 
 // Stack margin from screen edges
 pub var stack_margin: f32 = 24;
 
 const Toast = @This();
-var text_color: Vapor.Types.Color = .black;
 var total_height: f32 = 0;
+/// Hovered, the stack spreads out and every toast shows its content;
+/// otherwise only the front one does, over the edges of those behind.
+var expanded: bool = false;
 
 // State
 toast_type: ToastType = .info,
@@ -82,33 +96,39 @@ _title_buffer_len: usize = 0,
 _description_buffer: [256]u8 = undefined,
 _description_buffer_len: usize = 0,
 
-// Define animations (using your API style)
-const anim_enter = Animation.init("opaque-toast-enter")
-    .prop(.translateY, -20, 0)
-    .prop(.opacity, 0, 1)
+// Toasts slide in from their side of the screen and back out. They move
+// without fading: while an element's opacity is below 1 the browser stops
+// drawing its backdrop blur, so a blurred toast fading out lost its glass at
+// once and left its text fading on its own.
+const anim_enter_right = Animation.init("opaque-toast-enter-right")
+    .propUnit(.translateX, 120, 0, .percent)
     .duration(300)
     .easing(.easeOut)
     .fill(.forwards);
 
-const anim_exit = Animation.init("opaque-toast-exit")
-    .prop(.opacity, 1, 0)
-    .prop(.scale, 1, 0.95)
+const anim_enter_left = Animation.init("opaque-toast-enter-left")
+    .propUnit(.translateX, -120, 0, .percent)
+    .duration(300)
+    .easing(.easeOut)
+    .fill(.forwards);
+
+const anim_exit_right = Animation.init("opaque-toast-exit-right")
+    .propUnit(.translateX, 0, 120, .percent)
     .duration(200)
     .easing(.easeIn)
     .fill(.forwards);
 
-// Bottom position animations (enter from bottom)
-const anim_enter_bottom = Animation.init("opaque-toast-enter-bottom")
-    .prop(.translateY, 20, 0)
-    .prop(.opacity, 0, 1)
-    .duration(300)
-    .easing(.easeOut)
+const anim_exit_left = Animation.init("opaque-toast-exit-left")
+    .propUnit(.translateX, 0, -120, .percent)
+    .duration(200)
+    .easing(.easeIn)
     .fill(.forwards);
 
 pub fn new() void {
-    anim_enter.build();
-    anim_exit.build();
-    anim_enter_bottom.build();
+    anim_enter_right.build();
+    anim_enter_left.build();
+    anim_exit_right.build();
+    anim_exit_left.build();
     spinner.build();
     toasts = Vapor.array(Toast, .persist);
 }
@@ -258,12 +278,12 @@ pub fn hide(toast: *Toast) void {
     showAllToasts();
 }
 
-fn getTypeColor(toast_type: ToastType) Vapor.Types.Color {
+fn getIconColor(toast_type: ToastType) Vapor.Types.Color {
     return switch (toast_type) {
-        .success => text_color,
-        .err => text_color,
-        .warning => text_color,
-        .info => text_color,
+        .success => success_icon_color,
+        .err => err_icon_color,
+        .warning => warning_icon_color,
+        .info => info_icon_color,
     };
 }
 
@@ -277,6 +297,7 @@ fn getTypeIcon(toast_type: ToastType) Vapor.IconTokens {
 }
 
 fn onHover(_: *Vapor.Event) void {
+    expanded = true;
     for (toasts.items) |*t| {
         cancelToast(t);
     }
@@ -284,6 +305,7 @@ fn onHover(_: *Vapor.Event) void {
 }
 
 fn onLeave(_: *Vapor.Event) void {
+    expanded = false;
     movePreviousDown();
     for (toasts.items) |*t| {
         startToastTimeout(t);
@@ -375,7 +397,7 @@ fn getBackground(toast_type: ToastType) Vapor.Types.Color {
         .err => err_background,
         .warning => warning_background,
         .info => info_background,
-    };
+    } orelse background;
 }
 
 fn getTextColor(toast_type: ToastType) Vapor.Types.Color {
@@ -384,7 +406,7 @@ fn getTextColor(toast_type: ToastType) Vapor.Types.Color {
         .err => err_text_color,
         .warning => warning_text_color,
         .info => info_text_color,
-    };
+    } orelse text_color;
 }
 
 fn getBlur(toast_type: ToastType) u8 {
@@ -393,15 +415,6 @@ fn getBlur(toast_type: ToastType) u8 {
         .err => err_blur,
         .warning => warning_blur,
         .info => info_blur,
-    };
-}
-
-fn getBorderColor(toast_type: ToastType) Vapor.Types.Color {
-    return switch (toast_type) {
-        .success => success_background,
-        .err => err_background,
-        .warning => warning_background,
-        .info => info_background,
     };
 }
 
@@ -419,11 +432,8 @@ fn renderToast(toast: *Toast, index: usize, position: StackPosition) void {
         .bottom_left => Vapor.Types.Position.bl(.px(toast.offset), .px(0), .absolute),
     };
 
-    // Choose animation based on position
-    const enter_anim = if (position == .bottom_right or position == .bottom_left)
-        "opaque-toast-enter-bottom"
-    else
-        "opaque-toast-enter";
+    const on_left = position == .top_left or position == .bottom_left;
+    const content_opacity: f16 = if (expanded or index + 1 == toasts.items.len) 1 else 0;
 
     Box()
         .id(Vapor.fmtln("opaque-toast-{d}", .{toast.id}))
@@ -434,11 +444,10 @@ fn renderToast(toast: *Toast, index: usize, position: StackPosition) void {
                 .inset(0, -2, .transparentize(.black, 0.1))
                 .drop(0, 1, 3, .transparentize(.black, 0.2)),
         )
-        .border(.solid(.all(border_thickness), getBorderColor(toast.toast_type), border_radius))
-        // .border(.simple(.black))
+        .border(.solid(.all(border_thickness), border_color, border_radius))
         .pos(toast_pos)
-        .animationEnter(enter_anim)
-        .animationExit("opaque-toast-exit")
+        .animationEnter(if (on_left) "opaque-toast-enter-left" else "opaque-toast-enter-right")
+        .animationExit(if (on_left) "opaque-toast-exit-left" else "opaque-toast-exit-right")
         .zIndex(z_index)
         .transition(.{
             .properties = &.{ .top, .bottom, .scale, .opacity, .transform },
@@ -449,9 +458,7 @@ fn renderToast(toast: *Toast, index: usize, position: StackPosition) void {
         .height(.px(toast.height))
         .blur(getBlur(toast.toast_type))
         .inlineStyle("min-width: {d}px", .{toast.width})
-        // .width(.px(toast.width))
-        // .background(getBackground(toast.toast_type))
-        .background(background)
+        .background(getBackground(toast.toast_type))
         .layout(.x_between_center)
         .padding(.all(8))
         .spacing(8)
@@ -460,9 +467,11 @@ fn renderToast(toast: *Toast, index: usize, position: StackPosition) void {
         Center()
             .width(.px(32))
             .height(.px(32))
+            .opacity(content_opacity)
+            .duration(150)
             .children({
             Icon(getTypeIcon(toast.toast_type))
-                .font(18, 700, getTextColor(toast.toast_type))
+                .font(18, 700, getIconColor(toast.toast_type))
                 .end();
         });
 
@@ -471,6 +480,8 @@ fn renderToast(toast: *Toast, index: usize, position: StackPosition) void {
             .direction(.column)
             .layout(.left_center)
             .width(.grow)
+            .opacity(content_opacity)
+            .duration(150)
             .children({
             Text(toast._title_buffer[0..toast._title_buffer_len])
                 .font(14, 600, getTextColor(toast.toast_type))
@@ -487,6 +498,7 @@ fn renderToast(toast: *Toast, index: usize, position: StackPosition) void {
             .class("toast-close")
             .cursor(.pointer)
             .padding(.all(4))
+            .opacity(content_opacity)
             .duration(100)
             .hover(.{
                 .text_color = .transparentize(getTextColor(toast.toast_type), 0.5),
