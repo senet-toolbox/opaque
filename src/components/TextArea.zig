@@ -187,15 +187,15 @@ fn stringCallback(callback: Callback, evt: *Vapor.Event) void {
     }
 }
 
+/// Enter runs `on_enter` instead of starting a new line; Shift+Enter is a new
+/// line. Every other key types as usual.
 fn stringEnterCallback(callback: Callback, evt: *Vapor.Event) void {
+    if (!std.mem.eql(u8, evt.key(), "Enter") or evt.shiftKey()) return;
+    evt.preventDefault();
+    evt.stopPropagation();
     if (Vapor.Kit.throttle(60)) return;
-    const key = evt.key();
-    if (std.mem.eql(u8, key, "Enter") and !evt.shiftKey() or !evt.metaKey()) {
-        evt.preventDefault();
-        evt.stopPropagation();
-        if (callback.on_enter) |on_enter| {
-            on_enter(evt);
-        }
+    if (callback.on_enter) |on_enter| {
+        on_enter(evt);
     }
 }
 
@@ -469,10 +469,6 @@ pub fn render(field: Field) void {
         .outline(.none, null)
         .background(background)
         .shadow(.glow(3, if (is_focused) .transparentize(.palette(.tint), 0.2) else .transparent))
-        // .shadow(.{
-        //     .color = if (is_focused) .transparentizeHex(.palette(.tint), 0.2) else .transparent,
-        //     .spread = 3,
-        // })
         // OVERRIDE Padding here to account for icons
         .onEvent(.focus, handleFocus, .{stable_id})
         .onEvent(.blur, handleBlur, .{stable_id})
