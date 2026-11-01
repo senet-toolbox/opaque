@@ -702,11 +702,26 @@ pub const Chart = struct {
                 }
             }
 
+            // A set domain (a zoom, or one passed in) can leave data outside
+            // the axes, so the series are clipped to the plot area. An auto
+            // domain always fits the data; clipping it would halve the dots
+            // that sit on an edge.
+            const clip = x_config.domain == .manual or y_config.domain == .manual;
+            if (clip) {
+                try svg.print(
+                    \\<defs><clipPath id="opaque-chart-clip-{x}"><rect x="0" y="0" width="{d}" height="{d}"/></clipPath></defs>
+                    \\<g clip-path="url(#opaque-chart-clip-{x})">
+                    \\
+                , .{ @intFromPtr(self), chart_width, chart_height, @intFromPtr(self) });
+            }
+
             // Render each series
             for (self.series.items, 0..) |s, i| {
                 const series_color = s.options.color orelse Vapor.Types.Color.hex(self.config.palette.get(i));
                 try self.renderSeries(&svg, s, i, x_scale, y_scale, series_color);
             }
+
+            if (clip) try svg.closeGroup();
 
             // Axes
             if (self.x_axis_config) |_| {
