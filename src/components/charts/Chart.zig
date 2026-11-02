@@ -1864,6 +1864,13 @@ pub const Chart = struct {
             const min_x = @min(sel.start_x, sel.current_x);
             const min_y = @min(sel.start_y, sel.current_y);
 
+            // The box is drawn on the render after pointerdown; a move that
+            // comes first renders it instead of moving it.
+            if (self.selection_rect._get_id() == null) {
+                Vapor.cycle();
+                return;
+            }
+
             _ = self.selection_rect.translate3d(.{ .x = min_x, .y = min_y });
             const width = @abs(sel.current_x - sel.start_x);
             const height = @abs(sel.current_y - sel.start_y);
