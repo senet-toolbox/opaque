@@ -98,6 +98,7 @@ pub const Svg = struct {
         try self.buffer.print(self.allocator, "<path id=\"{s}\" d=\"{s}\"", .{ opts.id, d });
         if (opts.class) |c| try self.buffer.print(self.allocator, " class=\"{s}\"", .{c});
         if (opts.fill) |f| try self.buffer.print(self.allocator, " fill=\"{s}\"", .{convertColor(f)});
+        if (opts.fill_opacity) |fo| try self.buffer.print(self.allocator, " fill-opacity=\"{d}\"", .{fo});
         if (opts.stroke) |s| try self.buffer.print(self.allocator, " stroke=\"{s}\"", .{convertColor(s)});
         if (opts.stroke_width) |sw| try self.buffer.print(self.allocator, " stroke-width=\"{d}\"", .{sw});
         try self.buffer.appendSlice(self.allocator, "/>\n");
@@ -151,6 +152,7 @@ pub const Svg = struct {
         id: []const u8 = "",
         class: ?[]const u8 = null,
         fill: ?Vapor.Types.Color = null,
+        fill_opacity: ?f64 = null,
         stroke: ?Vapor.Types.Color = null,
         stroke_width: ?f32 = null,
     };

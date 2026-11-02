@@ -551,16 +551,19 @@ pub const Chart = struct {
         // beats an element's fill or stroke attribute.
         var text_buf: [64]u8 = undefined;
         var line_buf: [64]u8 = undefined;
+        var page_buf: [64]u8 = undefined;
         const text = cssColor(&text_buf, .palette(.text_color));
         const line = cssColor(&line_buf, .palette(.border_color_light));
+        const page = cssColor(&page_buf, .palette(.background));
         try svg.print(
             \\<style>.axis-label {{ fill: {s}; fill-opacity: 0.8; }}
             \\.grid {{ stroke: {s}; }}
             \\.tick-label {{ fill: {s}; fill-opacity: 0.6; }}
             \\.pie-label {{ fill: {s}; }}
-            \\.pie-label-line {{ stroke: {s}; stroke-opacity: 0.4; }}</style>
+            \\.pie-label-line {{ stroke: {s}; stroke-opacity: 0.4; }}
+            \\.series-dot {{ stroke: {s}; }}</style>
             \\
-        , .{ text, line, text, text, text });
+        , .{ text, line, text, text, text, page });
         try svg.style(
             \\.axis { stroke-width: 1; }
             \\.axis-label { font-size: 12px; }
@@ -569,7 +572,7 @@ pub const Chart = struct {
             \\.legend-text { font-size: 11px; user-select: none; }
             \\.series-line { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: all 200ms ease-in-out; }
             \\.series-area { stroke: none; }
-            \\.series-dot { stroke: white; stroke-width: 1.5; transition: all 200ms ease-in-out; }
+            \\.series-dot { stroke-width: 1.5; transition: all 200ms ease-in-out; }
             \\.series-bar { transition: all 200ms ease-in-out; }
             \\.stacked-bar { transition: all 200ms ease-in-out; }
             \\.shadow-bar { transition: all 200ms ease-in-out; }
@@ -809,6 +812,16 @@ pub const Chart = struct {
     }
 
     /// NEW: Render pie or donut chart
+    /// A pie slice's colour: its first stack segment's, else the palette's.
+    fn sliceColor(self: *Chart, p: Point, point_index: usize) Vapor.Types.Color {
+        if (p.stack) |stack| {
+            if (stack.len > 0) {
+                if (stack[0].color) |color| return color;
+            }
+        }
+        return Vapor.Types.Color.hex(self.config.palette.get(point_index));
+    }
+
     fn renderPie(self: *Chart, svg: *Svg, s: Series, series_index: usize, chart_width: f64, chart_height: f64) !void {
         if (s.data.len == 0) return;
 
@@ -855,11 +868,7 @@ pub const Chart = struct {
             const start_angle = current_angle + pad_angle / 2.0;
             const end_angle = start_angle + slice_angle;
 
-            // Get color for this slice
-            const slice_color = if (p.stack) |stack|
-                (if (stack.len >= 0) stack[0].color orelse Vapor.Types.Color.hex(self.config.palette.get(point_index)) else Vapor.Types.Color.hex(self.config.palette.get(point_index)))
-            else
-                Vapor.Types.Color.hex(self.config.palette.get(point_index));
+            const slice_color = self.sliceColor(p, point_index);
 
             // Generate arc path
             const path_d = try self.generateArcPath(
@@ -1260,6 +1269,7 @@ pub const Chart = struct {
             .id = path_id,
             .class = "series-area",
             .fill = series_color,
+            .fill_opacity = s.options.fill_opacity,
         });
 
         try self.rendered_elements.append(.{
@@ -1455,9 +1465,58 @@ pub const Chart = struct {
         }
     }
 
+    const LegendItem = struct {
+        title: []const u8,
+        color: Vapor.Types.Color,
+        id: ElementId,
+        /// The title was made here (a slice with no label) and is freed with the items.
+        owned: bool = false,
+    };
+
+    /// The legend's items: one per series, except a pie or donut, which
+    /// gets one per slice under the slice's label; then the custom fields.
+    fn legendItems(self: *Chart) ![]LegendItem {
+        var items = std.array_list.Managed(LegendItem).init(self.allocator);
+        errdefer items.deinit();
+        for (self.series.items, 0..) |s, i| {
+            if (s.type == .pie or s.type == .donut) {
+                for (s.data, 0..) |p, point_index| {
+                    const title = p.label orelse try std.fmt.allocPrint(self.allocator, "{s} {d}", .{ s.name, point_index + 1 });
+                    try items.append(.{
+                        .title = title,
+                        .owned = p.label == null,
+                        .color = self.sliceColor(p, point_index),
+                        .id = .{ .series_name = s.name, .series_index = @intCast(i), .point_index = @intCast(point_index), .element_type = .legend },
+                    });
+                }
+            } else {
+                try items.append(.{
+                    .title = s.name,
+                    .color = s.options.color orelse Vapor.Types.Color.hex(self.config.palette.get(i)),
+                    .id = .{ .series_name = s.name, .series_index = @intCast(i), .element_type = .legend },
+                });
+            }
+        }
+        if (self.legend_config) |cfg| {
+            for (cfg.fields, self.series.items.len..) |f, i| {
+                try items.append(.{
+                    .title = f.title,
+                    .color = f.color,
+                    .id = .{ .series_name = "", .series_index = @intCast(i), .element_type = .legend },
+                });
+            }
+        }
+        return items.toOwnedSlice();
+    }
+
     fn renderLegend(self: *Chart, svg: *Svg) !void {
         const cfg = self.legend_config orelse return;
         const m = self.config.margin;
+        const items = try self.legendItems();
+        defer {
+            for (items) |item| if (item.owned) self.allocator.free(item.title);
+            self.allocator.free(items);
+        }
 
         // A row's items are as wide as their text, and the row stays over
         // the plot: right-aligned when it fits, else from the left edge,
@@ -1465,8 +1524,7 @@ pub const Chart = struct {
         const left: f64 = @floatFromInt(m.left);
         const right: f64 = @floatFromInt(self.config.width -| m.right);
         var row_width: f64 = 0;
-        for (self.series.items) |s| row_width += legendItemWidth(s.name);
-        for (cfg.fields) |f| row_width += legendItemWidth(f.title);
+        for (items) |item| row_width += legendItemWidth(item.title);
 
         // Starting position based on position config
         const start_x: f64 = switch (cfg.position) {
@@ -1485,49 +1543,24 @@ pub const Chart = struct {
         var current_x = start_x;
         var current_y = start_y;
 
-        // Render series legends
-        for (self.series.items, 0..) |s, i| {
-            if (cfg.direction == .row) wrapLegend(&current_x, &current_y, s.name, start_x, right, cfg.spacing);
-            const series_color = s.options.color orelse Vapor.Types.Color.hex(self.config.palette.get(i));
+        for (items, 0..) |item, i| {
+            if (cfg.direction == .row) wrapLegend(&current_x, &current_y, item.title, start_x, right, cfg.spacing);
 
             var id_buf: [64]u8 = undefined;
             const id = try std.fmt.bufPrint(&id_buf, "chart-legend-{d}", .{i});
-            try svg.rect(current_x, current_y - 6, 12, 12, .{ .fill = series_color, .rx = 2, .id = id });
+            try svg.rect(current_x, current_y - 6, 12, 12, .{ .fill = item.color, .rx = 2, .id = id });
 
             try self.rendered_elements.append(.{
-                .id = .{ .series_name = s.name, .series_index = @intCast(i), .element_type = .legend },
+                .id = item.id,
                 .attrs = .{ .rect = .{ .x = current_x, .y = current_y - 6, .width = 12, .height = 12 } },
             });
 
-            try svg.text(current_x + 18, current_y + 3, s.name, .{ .class = "legend-text", .fill = cfg.text_color orelse .palette(.text_color) });
+            try svg.text(current_x + 18, current_y + 3, item.title, .{ .class = "legend-text", .fill = cfg.text_color orelse .palette(.text_color) });
 
             // Advance position based on direction
             switch (cfg.direction) {
                 .column => current_y += cfg.spacing,
-                .row => current_x += legendItemWidth(s.name),
-            }
-        }
-
-        // Render custom field legends
-        for (cfg.fields, self.series.items.len..) |f, i| {
-            if (cfg.direction == .row) wrapLegend(&current_x, &current_y, f.title, start_x, right, cfg.spacing);
-            const series_color = f.color;
-
-            var id_buf: [64]u8 = undefined;
-            const id = try std.fmt.bufPrint(&id_buf, "chart-legend-{d}", .{i});
-            try svg.rect(current_x, current_y - 6, 12, 12, .{ .fill = series_color, .rx = 2, .id = id });
-
-            try self.rendered_elements.append(.{
-                .id = .{ .series_name = "", .series_index = @intCast(i), .element_type = .legend },
-                .attrs = .{ .rect = .{ .x = current_x, .y = current_y - 6, .width = 12, .height = 12 } },
-            });
-
-            try svg.text(current_x + 18, current_y + 3, f.title, .{ .class = "legend-text", .fill = cfg.text_color orelse .palette(.text_color) });
-
-            // Advance position based on direction
-            switch (cfg.direction) {
-                .column => current_y += cfg.spacing,
-                .row => current_x += legendItemWidth(f.title),
+                .row => current_x += legendItemWidth(item.title),
             }
         }
     }
