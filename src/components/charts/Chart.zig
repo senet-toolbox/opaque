@@ -143,9 +143,8 @@ pub const Chart = struct {
     selection_rect: Vapor.Element = .{},
     zoom_enabled: bool = true,
 
-    // Store original domains for reset
-    original_x_domain: ?[2]f64 = null,
-    original_y_domain: ?[2]f64 = null,
+    // The axes as they were before the first zoom, for resetZoom.
+    pre_zoom_axes: ?struct { x: ?AxisConfig, y: ?AxisConfig } = null,
 
     old_points: ?[]HoveredPoint = null,
 
@@ -547,12 +546,26 @@ pub const Chart = struct {
         // SVG Header
         try svg.openSvg(self.config.width, self.config.height);
 
-        // Styles
+        // Styles. The text and grid take the theme's colours. Only elements
+        // with no colour of their own are coloured here: a stylesheet rule
+        // beats an element's fill or stroke attribute.
+        var text_buf: [64]u8 = undefined;
+        var line_buf: [64]u8 = undefined;
+        const text = cssColor(&text_buf, .palette(.text_color));
+        const line = cssColor(&line_buf, .palette(.border_color_light));
+        try svg.print(
+            \\<style>.axis-label {{ fill: {s}; fill-opacity: 0.8; }}
+            \\.grid {{ stroke: {s}; }}
+            \\.tick-label {{ fill: {s}; fill-opacity: 0.6; }}
+            \\.pie-label {{ fill: {s}; }}
+            \\.pie-label-line {{ stroke: {s}; stroke-opacity: 0.4; }}</style>
+            \\
+        , .{ text, line, text, text, text });
         try svg.style(
             \\.axis { stroke-width: 1; }
-            \\.axis-label { font-size: 12px; fill: #333; }
-            \\.grid { stroke: #e5e5e5; stroke-width: 1; }
-            \\.tick-label { font-size: 10px; fill: #666; user-select: none; }
+            \\.axis-label { font-size: 12px; }
+            \\.grid { stroke-width: 1; }
+            \\.tick-label { font-size: 10px; user-select: none; }
             \\.legend-text { font-size: 11px; user-select: none; }
             \\.series-line { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: all 200ms ease-in-out; }
             \\.series-area { stroke: none; }
@@ -562,8 +575,8 @@ pub const Chart = struct {
             \\.shadow-bar { transition: all 200ms ease-in-out; }
             \\.pie-slice { transition: all 200ms ease-in-out; }
             \\.pie-slice:hover { opacity: 0.8; transform-origin: center; }
-            \\.pie-label { font-size: 11px; fill: #333; pointer-events: none; }
-            \\.pie-label-line { stroke: #999; stroke-width: 1; fill: none; }
+            \\.pie-label { font-size: 11px; pointer-events: none; }
+            \\.pie-label-line { stroke-width: 1; fill: none; }
         );
 
         // Background
@@ -1486,7 +1499,7 @@ pub const Chart = struct {
                 .attrs = .{ .rect = .{ .x = current_x, .y = current_y - 6, .width = 12, .height = 12 } },
             });
 
-            try svg.text(current_x + 18, current_y + 3, s.name, .{ .class = "legend-text", .fill = cfg.text_color });
+            try svg.text(current_x + 18, current_y + 3, s.name, .{ .class = "legend-text", .fill = cfg.text_color orelse .palette(.text_color) });
 
             // Advance position based on direction
             switch (cfg.direction) {
@@ -1509,7 +1522,7 @@ pub const Chart = struct {
                 .attrs = .{ .rect = .{ .x = current_x, .y = current_y - 6, .width = 12, .height = 12 } },
             });
 
-            try svg.text(current_x + 18, current_y + 3, f.title, .{ .class = "legend-text", .fill = cfg.text_color });
+            try svg.text(current_x + 18, current_y + 3, f.title, .{ .class = "legend-text", .fill = cfg.text_color orelse .palette(.text_color) });
 
             // Advance position based on direction
             switch (cfg.direction) {
@@ -1862,8 +1875,8 @@ pub const Chart = struct {
 
     // Called on pointerup
     pub fn endSelection(self: *Chart, event: *Vapor.Event) void {
-        _ = event;
         if (self.selection) |sel| {
+            self.selection = null;
             if (!sel.is_dragging) return;
 
             // Calculate selection bounds (handle any drag direction)
@@ -1875,17 +1888,14 @@ pub const Chart = struct {
             // Minimum selection size (prevent accidental tiny selections)
             const min_size: f32 = 20;
             if ((max_x - min_x) < min_size or (max_y - min_y) < min_size) {
-                self.selection = null;
                 return;
             }
 
             // Convert screen coordinates to data coordinates
             if (self.x_scale) |x_scale| {
                 if (self.y_scale) |y_scale| {
-                    // Store original domains on first zoom
-                    if (self.original_x_domain == null) {
-                        self.original_x_domain = .{ x_scale.domainMin(), x_scale.domainMax() };
-                        self.original_y_domain = .{ y_scale.domainMin(), y_scale.domainMax() };
+                    if (self.pre_zoom_axes == null) {
+                        self.pre_zoom_axes = .{ .x = self.x_axis_config, .y = self.y_axis_config };
                     }
 
                     // Convert to chart-local coordinates
@@ -1904,11 +1914,14 @@ pub const Chart = struct {
 
                     // Apply zoom by updating axis configs
                     self.applyZoom(new_x_min, new_x_max, new_y_min, new_y_max);
+
+                    // The rebuild emptied the tooltip; fill it for the point
+                    // under the pointer, which hasn't moved.
+                    self.old_x = std.math.nan(f64);
+                    self.updateTooltip(event);
                 }
             }
         }
-
-        self.selection = null;
     }
 
     fn applyZoom(self: *Chart, x_min: f64, x_max: f64, y_min: f64, y_max: f64) void {
@@ -1938,24 +1951,20 @@ pub const Chart = struct {
         Vapor.cycle();
     }
 
-    // Reset zoom to original view
+    /// Zooms back out to the view before the first zoom. The chart's Reset
+    /// zoom button and a double-click on the chart call it.
     pub fn resetZoom(self: *Chart) void {
-        if (self.original_x_domain) |x_dom| {
-            if (self.x_axis_config) |*cfg| {
-                cfg.scale.domain = .{ .manual = x_dom };
-            }
-        }
-        if (self.original_y_domain) |y_dom| {
-            if (self.y_axis_config) |*cfg| {
-                cfg.scale.domain = .{ .manual = y_dom };
-            }
-        }
-
-        self.original_x_domain = null;
-        self.original_y_domain = null;
+        const axes = self.pre_zoom_axes orelse return;
+        self.x_axis_config = axes.x;
+        self.y_axis_config = axes.y;
+        self.pre_zoom_axes = null;
 
         self.build() catch {};
         Vapor.cycle();
+    }
+
+    fn resetZoomOnDoubleClick(self: *Chart, _: *Vapor.Event) void {
+        self.resetZoom();
     }
 
     /// --------------------------------------
@@ -1999,6 +2008,7 @@ pub const Chart = struct {
                 .onEvent(.pointerdown, startSelection, .{self}) // Add this
                 .onEvent(.pointermove, updateSelection, .{self}) // Combined handler
                 .onEvent(.pointerup, endSelection, .{self}) // Add this
+                .onEvent(.dblclick, resetZoomOnDoubleClick, .{self})
                 .children({
                 if (self.tooltip) |*tooltip| {
                     if (self.config.show_line) {
@@ -2083,6 +2093,22 @@ pub const Chart = struct {
                     Vapor.Null();
                 }
 
+                if (self.pre_zoom_axes != null) {
+                    Vapor.Button(resetZoom, .{self})
+                        .ariaLabel("Reset zoom")
+                        .pos(.tl(.px(@floatFromInt(self.config.margin.top + 8)), .px(@floatFromInt(self.config.margin.left + 8)), .absolute))
+                        .zIndex(10)
+                        .padding(.xy(8, 4))
+                        .background(.palette(.background))
+                        .border(.round(.palette(.border_color_light), .all(6)))
+                        .cursor(.pointer)
+                        .children({
+                        Text("Reset zoom")
+                            .inlineStyle("user-select: none;", .{})
+                            .font(12, 400, .palette(.text_color)).end();
+                    });
+                }
+
                 // Selection rectangle overlay
                 if (self.selection) |sel| {
                     if (sel.is_dragging) {
@@ -2121,6 +2147,14 @@ pub const Chart = struct {
         });
     }
 };
+
+/// A colour as CSS, written into `buf`.
+fn cssColor(buf: []u8, color: Vapor.Types.Color) []const u8 {
+    var w: Writer = undefined;
+    w.init(buf);
+    color.toCss(&w) catch {};
+    return w.buffer[0..w.pos];
+}
 
 fn findMin(data: []const f64) f64 {
     if (data.len == 0) return 0;
