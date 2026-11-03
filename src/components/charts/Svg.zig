@@ -72,6 +72,7 @@ pub const Svg = struct {
         if (opts.class) |c| try self.buffer.print(self.allocator, " class=\"{s}\"", .{c});
         if (opts.stroke) |s| try self.buffer.print(self.allocator, " stroke=\"{s}\"", .{convertColor(s)});
         if (opts.stroke_width) |sw| try self.buffer.print(self.allocator, " stroke-width=\"{d}\"", .{sw});
+        if (opts.dash) |d| try self.buffer.print(self.allocator, " stroke-dasharray=\"{s}\"", .{d});
         try self.buffer.appendSlice(self.allocator, "/>\n");
     }
 
@@ -128,6 +129,8 @@ pub const Svg = struct {
         class: ?[]const u8 = null,
         stroke: ?Vapor.Types.Color = null,
         stroke_width: ?f32 = null,
+        /// A stroke-dasharray, such as "4 4".
+        dash: ?[]const u8 = null,
     };
 
     pub const RectOpts = struct {

@@ -52,3 +52,7 @@ pub const Radio = Components.Radio;
 
 pub const new = Components.new;
 pub const initAnimations = Components.initAnimations;
+
+test {
+    _ = @import("components/charts/Chart.zig");
+}
