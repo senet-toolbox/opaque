@@ -262,6 +262,7 @@ const TooltipOptions = struct {
     border: Vapor.Types.Border = .round(.transparent, .all(6)),
     position: Vapor.Types.AnchorPlacement = .top,
     erased_callback: ?ErasedCallback = null,
+    trigger_focusable: bool = false,
 };
 
 fn onHover(tooltip: *ToolTip, _: *Vapor.Event) void {
@@ -337,6 +338,9 @@ const Options = struct {
     stroke_color: Vapor.Types.Color = .black,
     border: Vapor.Types.Border = .round(.transparent, .all(6)),
     position: Vapor.Types.AnchorPlacement = .top,
+    /// Set when a custom trigger is itself a button or link: it then takes
+    /// the focus, and the box around it does not as well.
+    trigger_focusable: bool = false,
 };
 
 fn HoverRow() Vapor.Builder(.pure) {
@@ -370,6 +374,7 @@ pub fn create(options: Options) *ToolTip {
             .stroke_color = options.stroke_color,
             .border = options.border,
             .position = options.position,
+            .trigger_focusable = options.trigger_focusable,
         } };
 
         tooltips.put(stable_id, tooltip) catch unreachable;
@@ -388,6 +393,9 @@ pub fn Trigger(tooltip: *ToolTip, trigger: anytype, args: anytype) *ToolTip {
     const anchor_name = tooltip.options.anchor_name;
     container
         .width(.fit)
+        // A custom trigger is reachable from the keyboard: focus shows the
+        // tooltip, as hover does.
+        .tabIndex(if (tooltip.options.trigger_focusable) -1 else 0)
         .onEvent(.pointerenter, onHover, .{tooltip})
         .onEvent(.pointerleave, onLeave, .{tooltip})
         .onEvent(.focusin, onHover, .{tooltip})
@@ -497,7 +505,11 @@ pub fn simpleWithPosition(title: []const u8, content: []const u8, position: Vapo
     const anchor_name = uuid;
     tooltip.options.anchor_name = anchor_name;
 
+    // A custom trigger is reachable from the keyboard; the default one
+    // takes the focus itself.
+    const custom = tooltip.options.trigger != null or tooltip.options.trigger_ctx != null;
     hover_box
+        .tabIndex(if (custom and !tooltip.options.trigger_focusable) 0 else -1)
         .onEvent(.pointerenter, onHover, .{tooltip})
         .onEvent(.pointerleave, onLeave, .{tooltip})
         .onEvent(.focusin, onHover, .{tooltip})
@@ -550,6 +562,7 @@ pub fn render(tooltip_options: Options) void {
             .component = tooltip_options.component,
             .container = hover_box,
             .position = tooltip_options.position,
+            .trigger_focusable = tooltip_options.trigger_focusable,
         } };
 
         tooltips.put(stable_id, tooltip) catch unreachable;
@@ -559,7 +572,11 @@ pub fn render(tooltip_options: Options) void {
     const anchor_name = if (tooltip_options.id.len > 0) tooltip_options.id else uuid;
     tooltip.options.anchor_name = anchor_name;
 
+    // A custom trigger is reachable from the keyboard; the default one
+    // takes the focus itself.
+    const custom = tooltip.options.trigger != null or tooltip.options.trigger_ctx != null;
     hover_box
+        .tabIndex(if (custom and !tooltip.options.trigger_focusable) 0 else -1)
         .onEvent(.pointerenter, onHover, .{tooltip})
         .onEvent(.pointerleave, onLeave, .{tooltip})
         .onEvent(.focusin, onHover, .{tooltip})

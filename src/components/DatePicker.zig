@@ -76,6 +76,7 @@ on_prev_month: ?*const fn () void = null,
 // Colors
 tint: Vapor.Types.Color = .palette(.tint),
 background: Vapor.Types.Color = .palette(.background),
+/// The chosen day's number, on its tint fill.
 selected_text_color: Vapor.Types.Color = .white,
 text_color: Vapor.Types.Color = .palette(.text),
 border_color: Vapor.Types.Color = .palette(.text),
@@ -196,6 +197,7 @@ fn isSelectedShadow(date_picker: *DatePicker, date_time: DateTime) Vapor.Types.S
 }
 
 fn isSelectedText(date_picker: *DatePicker, date_time: DateTime) Vapor.Types.Color {
+    if (isSameDay(date_picker._selected_date, date_time)) return date_picker.selected_text_color;
     if (DateTime.isWithinMonth(date_time, date_picker._viewed_date.month, date_picker._viewed_date.year)) {
         return date_picker.text_color;
     } else {
@@ -359,13 +361,16 @@ pub fn render(date_picker: *DatePicker) void {
                 .spacing(2)
                 .children({
                 for (date_picker._all_dates) |date| {
-                    const color: Vapor.Types.Color = if (date_picker.isSelected(date)) date_picker.background else .transparentize(.black, 0.05);
+                    const chosen = date_picker.isSelected(date);
+                    // The chosen day is filled with the tint; the rest
+                    // darken a little under the pointer.
+                    const color: Vapor.Types.Color = if (chosen) date_picker.tint else .transparentize(.black, 0.05);
                     Button(selectDate, .{ date_picker, date })
                         // Named by its full date, and pressed when chosen.
                         .a11y(Vapor.Accessibility.init().setPressed(if (date_picker.isSelected(date)) .true_val else .false_val))
                         .ariaLabel(Vapor.fmtln("{s} {d}, {d}", .{ DateTime.monthString(date.month), date.day, date.year }))
                         .cursor(.pointer)
-                        .background(date_picker.background)
+                        .background(if (chosen) date_picker.tint else date_picker.background)
                         .width(.px(date_picker._cell_dim))
                         .height(.px(date_picker._cell_dim))
                         .mt(2)

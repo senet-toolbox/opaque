@@ -33,9 +33,17 @@ pub fn new() void {
 content: ?*const fn (*Alert) void = null,
 closed: bool = true,
 background: Vapor.Types.Color = .palette(.background),
-border: Vapor.Types.Border = .round(.hex("#e4e4e4"), .all(12)),
+border: Vapor.Types.Border = .round(.palette(.border_color_light), .all(12)),
 on_enter: ?*const fn (*Alert) void = null,
+/// Called when it is dismissed: Escape, or a click outside.
 on_close: ?*const fn () void = null,
+/// Names it for screen readers.
+label: []const u8 = "Alert",
+/// The button that opens it: bind it with `.ref(&alert.trigger)` and the
+/// focus goes back to it when the alert closes.
+trigger: Vapor.Element = .{},
+/// The alert's panel, which takes the focus when it opens.
+panel: Vapor.Element = .{},
 
 pub fn init(content: ?*const fn (*Alert) void) Alert {
     return Alert{
@@ -49,15 +57,28 @@ pub fn open(alert: *Alert) void {
 
 pub fn close(alert: *Alert) void {
     alert.closed = true;
+    // Back to the button that opened it, if it was bound.
+    if (alert.trigger._get_id() != null) Vapor.onLayout(focusTrigger, .{alert});
 }
 
-fn evtClose(alert: *Alert, evt: *Vapor.Event) void {
-    evt.preventDefault();
-    alert.closed = true;
+fn focusTrigger(alert: *Alert) void {
+    alert.trigger.focus();
+}
+
+/// Escape or a click outside: closes it and tells on_close.
+fn dismiss(alert: *Alert) void {
+    alert.close();
+    if (alert.on_close) |on_close| on_close();
 }
 
 fn mount(alert: *Alert) void {
     OverlayManager.register(.keydown, handleKeyPress, .{alert});
+    // The focus moves into the alert, so keys and screen readers are there.
+    Vapor.onLayout(focusPanel, .{alert});
+}
+
+fn focusPanel(alert: *Alert) void {
+    alert.panel.focus();
 }
 
 fn destroy(alert: *Alert) void {
@@ -69,10 +90,7 @@ fn handleKeyPress(alert: *Alert, evt: *Vapor.Event) void {
     const key = evt.key();
     if (std.mem.eql(u8, key, "Escape")) {
         evt.preventDefault();
-        alert.closed = true;
-        if (alert.on_close) |on_close| {
-            on_close();
-        }
+        alert.dismiss();
     }
     if (std.mem.eql(u8, key, "Enter")) {
         evt.preventDefault();
@@ -101,7 +119,10 @@ pub fn render(alert: *Alert) void {
         .animationExit("opaque-dialog-exit")
         .layout(.center)
         .children({
-        Button(close, .{alert})
+        // Catches a click outside; the keyboard has Escape instead.
+        Button(dismiss, .{alert})
+            .ariaHidden(true)
+            .tabIndex(-1)
             .size(.full)
             .pos(.tl(.px(0), .px(0), .fixed))
             .size(.full)
@@ -109,6 +130,10 @@ pub fn render(alert: *Alert) void {
             .zIndex(999)
             .children({});
         Box()
+            .ref(&alert.panel)
+            .a11y(Vapor.Accessibility.alertDialog(alert.label))
+            .tabIndex(-1)
+            .inlineStyle("outline: none;", .{})
             .background(alert.background)
             .shadow(.glow(30, .transparentize(.black, 0.05)))
             .border(alert.border)

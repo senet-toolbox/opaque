@@ -18,6 +18,8 @@ active_tab: ?[]const u8 = null,
 names: []const []const u8,
 on_click: ?*const fn (*Tabs) void = null,
 selected_index: usize = 0,
+/// Names the tab list for screen readers: what the tabs switch between.
+aria_label: []const u8 = "Tabs",
 // tabs: std.array_list.Managed(Tab),
 
 pub fn new() void {
@@ -47,6 +49,11 @@ pub fn switchToTab(tag: []const u8, index: usize) void {
 }
 
 pub fn NavBar(tag: []const u8, names: []const []const u8) usize {
+    return NavBarLabelled(tag, names, "Tabs");
+}
+
+/// A NavBar whose tab list is named `label` for screen readers.
+pub fn NavBarLabelled(tag: []const u8, names: []const []const u8, label: []const u8) usize {
     // 1. Retrieve or Create State
     const tabs = peristant_tabs.get(tag) orelse blk: {
         const t = Vapor.arena(.persist).create(Tabs) catch unreachable;
@@ -72,6 +79,7 @@ pub fn NavBar(tag: []const u8, names: []const []const u8) usize {
         }
     }
 
+    tabs.aria_label = label;
     Nav(tabs, active_idx);
     tabs.selected_index = active_idx;
 
@@ -102,6 +110,12 @@ pub fn default(tabs: *Tabs, name: ?[]const u8) *Tabs {
 
 pub fn onClick(tabs: *Tabs, callback: *const fn (*Tabs) void) *Tabs {
     tabs.on_click = callback;
+    return tabs;
+}
+
+/// Names the tab list for screen readers.
+pub fn ariaLabel(tabs: *Tabs, label: []const u8) *Tabs {
+    tabs.aria_label = label;
     return tabs;
 }
 
@@ -142,7 +156,7 @@ pub fn Trigger(tabs: *Tabs, trigger_fn: *const fn (*Tabs, []const u8, bool) void
     }
 
     Box()
-        .a11y(.tabList("Main navigation tabs"))
+        .a11y(.tabList(tabs.aria_label))
         .onEvent(.keydown, navKey, .{tabs})
         .layout(.left_center)
         .padding(.all(2))
@@ -198,7 +212,7 @@ fn NavBtn(ctx: ?*anyopaque) void {
 fn Nav(tabs: *Tabs, active_idx: usize) void {
     // Tabs that do not fit scroll sideways instead of widening the page.
     Box()
-        .a11y(.tabList("Main navigation tabs"))
+        .a11y(.tabList(tabs.aria_label))
         .onEvent(.keydown, navKey, .{tabs})
         .inlineStyle("max-width: 100%;", .{})
         .scroll(.scrollX())

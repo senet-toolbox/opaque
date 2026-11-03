@@ -70,8 +70,11 @@ pub fn ComboBoxDialog(comptime T: type) type {
         ctx: ?*anyopaque = null,
         on_select: ?*const fn (item: *ItemT) void = null,
         on_select_ctx: ?*const fn (item: *ItemT, ctx: ?*anyopaque) void = null,
+        /// Called once when it closes: Escape, a pick, or a click outside.
         on_close: ?*const fn () void = null,
         on_mount: ?*const fn () void = null,
+        /// Names the dialog for screen readers.
+        aria_label: []const u8 = "Search",
         on_close_ctx: ?*const fn (ctx: ?*anyopaque) void = null,
         row_component: ?*const fn (self: *Self, item: *ItemT) void = null,
         render_trigger: bool = true,
@@ -334,10 +337,8 @@ pub fn ComboBoxDialog(comptime T: type) type {
 
             if (std.mem.eql(u8, key, "Escape")) {
                 evt.preventDefault();
+                // close() tells on_close.
                 combobox.close();
-                if (combobox.on_close) |callback| {
-                    @call(.auto, callback, .{});
-                }
                 return;
             }
 
@@ -458,7 +459,7 @@ pub fn ComboBoxDialog(comptime T: type) type {
 
         pub fn renderComboBoxDialog(combobox: *Self) void {
             Box()
-                .a11y(Vapor.Accessibility.dialog("Command Palette"))
+                .a11y(Vapor.Accessibility.dialog(combobox.aria_label))
                 .zIndex(999)
                 .width(.percent(100))
                 .children({
@@ -522,7 +523,7 @@ pub fn ComboBoxDialog(comptime T: type) type {
 
                     Stack()
                         .id(listbox_id) // or however you set HTML id in Vapor
-                        .a11y(.listbox("Select an option"))
+                        .a11y(.listbox("Results"))
                         .ref(&combobox.binded_combobox)
                         .height(.elastic(36, 392))
                         .width(.percent(100))
