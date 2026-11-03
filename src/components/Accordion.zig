@@ -18,8 +18,6 @@ const Button = Vapor.Button;
 const Accordion = @This();
 items: []AccordionItem,
 
-const duration_ms = 150;
-
 pub const AccordionItem = struct {
     title: []const u8,
     description: []const u8,
@@ -50,36 +48,15 @@ pub const AccordionItem = struct {
                     .font(12, 700, .palette(.text_color))
                     .end();
             });
-            // The panel: a grid of one row that animates between 0fr and
-            // 1fr, i.e. 0 and its content's height. The trigger stays out of
-            // this grid: next to a second row, the rows' share of the height
-            // left over mid-animation went to the trigger, which grew and
-            // shrank back, moving its title.
-            Box()
+            // Opens to its content's height, whatever it is, and shuts; shut,
+            // its content is out of the tab order and away from screen
+            // readers. The trigger stays outside it, so it never moves.
+            Vapor.Collapse(item.is_open)
                 .width(.percent(100))
-                .inlineStyle("display: grid; grid-template-rows: {s}; transition: grid-template-rows {d}ms ease-in-out;", .{
-                    if (item.is_open) "1fr" else "0fr",
-                    duration_ms,
-                })
+                .direction(.column)
+                .padding(.{ .left = 12, .right = 12, .bottom = 12 })
                 .children({
-                // Once closed it turns invisible, after the animation, which
-                // takes its buttons out of the tab order.
-                Box()
-                    .width(.percent(100))
-                    .direction(.column)
-                    .inlineStyle("min-height: 0; overflow: hidden; visibility: {s}; transition: visibility 0s linear {d}ms;", .{
-                        if (item.is_open) "visible" else "hidden",
-                        if (item.is_open) @as(u32, 0) else duration_ms,
-                    })
-                    .children({
-                    Box()
-                        .width(.percent(100))
-                        .direction(.column)
-                        .padding(.{ .left = 12, .right = 12, .bottom = 12 })
-                        .children({
-                        if (item.content) |content| content(item);
-                    });
-                });
+                if (item.content) |content| content(item);
             });
         });
     }
