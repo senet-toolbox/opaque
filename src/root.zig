@@ -49,10 +49,15 @@ pub const Marquee = Components.Marquee;
 pub const Carousel = Components.Carousel;
 pub const Checkbox = Components.Checkbox;
 pub const Radio = Components.Radio;
+pub const Menu = Components.Menu;
+pub const Avatar = Components.Avatar;
+pub const Badge = Components.Badge;
 
 pub const new = Components.new;
 pub const initAnimations = Components.initAnimations;
 
 test {
     _ = @import("components/charts/Chart.zig");
+    _ = @import("components/Avatar.zig");
+    _ = @import("components/Badge.zig");
 }

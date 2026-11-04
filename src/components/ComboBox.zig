@@ -93,14 +93,19 @@ pub fn ComboBox(comptime T: type) type {
             combobox._closed = true;
         }
 
+        /// Ticks the item with `selected_item`'s label, and only it.
         pub fn default(combobox: *Self, selected_item: Item) void {
+            combobox._selected_items.clearRetainingCapacity();
+            combobox._selected_count = 0;
             for (combobox.groups.items) |*group| {
                 for (group.items) |*item| {
-                    if (std.mem.eql(u8, item.label, selected_item.label)) continue;
-                    item.is_selected = false;
+                    item.is_selected = std.mem.eql(u8, item.label, selected_item.label);
+                    if (item.is_selected) {
+                        combobox._selected_items.put(item, {}) catch {};
+                        combobox._selected_count += 1;
+                    }
                 }
             }
-            combobox._selected_item = selected_item;
         }
 
         fn selectItem(combobox: *Self, item: *Item) void {

@@ -45,6 +45,9 @@ mode: SheetMode = .overlay,
 on_close: ?*const fn (*Sheet) void = null,
 /// Names the drawer for screen readers.
 label: []const u8 = "Drawer",
+/// The button that opens it: bind it with `.ref(&sheet.trigger)` and the
+/// focus goes back to it when the drawer closes.
+trigger: Vapor.Element = .{},
 /// The document keydown listener for Escape, while the sheet is open.
 escape_listener: ?u32 = null,
 
@@ -120,9 +123,20 @@ pub fn init(direction: SheetDirection) Sheet {
 pub fn close(sheet: *Sheet) void {
     sheet.closed = true;
     removeEscapeListener(sheet);
+    // Back to the button that opened it, if it was bound.
+    if (sheet.trigger._get_id() != null) Vapor.onLayout(focusTrigger, .{sheet});
     if (sheet.on_close) |on_close| {
         on_close(sheet);
     }
+}
+
+fn focusTrigger(sheet: *Sheet) void {
+    sheet.trigger.focus();
+}
+
+/// The focus moves into the drawer, so keys and screen readers are there.
+fn focusPanel(sheet: *Sheet) void {
+    sheet.binded.focus();
 }
 
 pub fn open(sheet: *Sheet) void {
@@ -206,6 +220,7 @@ fn mount(sheet: *Sheet) void {
     if (sheet.escape_listener == null) {
         sheet.escape_listener = Vapor.lib.addGlobalListenerCtx(.keydown, escape, .{sheet});
     }
+    Vapor.onLayout(focusPanel, .{sheet});
 }
 
 /// The panel left the page, however it was closed.
@@ -262,6 +277,8 @@ pub fn render(sheet: *Sheet) void {
         .a11y(Vapor.Accessibility.dialog(sheet.label))
         .pos(getPosition(sheet))
         .ref(&sheet.binded)
+        .tabIndex(-1)
+        .inlineStyle("outline: none;", .{})
         .zIndex(9999)
         .animationEnter(getAnimationEnter(sheet))
         .animationExit(getAnimationExit(sheet))

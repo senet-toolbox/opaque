@@ -24,6 +24,9 @@ pub const Options = struct {
     /// Gap between items in pixels
     gap: u8 = 16,
     repeat: usize = 4,
+    /// Names it for screen readers; it is a region a keyboard can reach,
+    /// and focus pauses it.
+    label: []const u8 = "Scrolling content",
 };
 
 // ============================================================================
@@ -66,11 +69,13 @@ pub fn new() void {
     animateRight.build();
     animateUp.build();
     animateDown.build();
-    // Vapor.injectCSS(
-    //     \\.marquee-viewport:hover .marquee-group {
-    //     \\  animation-play-state: paused;
-    //     \\}
-    // );
+    // Still under the pointer or while it has focus (WCAG 2.2.2: moving
+    // content can be paused),
+    // and for anyone who asks their system for less motion.
+    Vapor.injectCSS(
+        \\.marquee-viewport:hover .marquee-group, .marquee-viewport:focus-within .marquee-group { animation-play-state: paused; }
+        \\@media (prefers-reduced-motion: reduce) { .marquee-group { animation-play-state: paused !important; } }
+    );
 }
 
 // ============================================================================
@@ -88,12 +93,12 @@ pub fn render(options: Options) *Marquee {
     const is_vertical = options.direction == .up or options.direction == .down;
 
     const container = Row()
+        .class("marquee-viewport")
+        .a11y(Vapor.Accessibility.init().setRole(.region).setLabel(options.label))
+        .tabIndex(0)
         .width(.percent(100))
         .height(.percent(100))
         .center()
-        .hoverTarget("marquee-group", .{
-            .animation_play_state = .paused,
-        })
         .scroll(.none());
 
     const strip = if (is_vertical) Stack() else Row();
@@ -113,7 +118,8 @@ pub fn render(options: Options) *Marquee {
         break :blk g;
     };
 
-    const m = Vapor.arena(.persist).create(Marquee) catch unreachable;
+    // Only for this render: children() closes it straight after.
+    const m = Vapor.arena(.frame).create(Marquee) catch unreachable;
     m.* = .{
         .options = options,
         .container = container,

@@ -36,6 +36,9 @@ pub const Marquee = @import("Marquee.zig");
 pub const Carousel = @import("Carousel.zig");
 pub const Checkbox = @import("Checkbox.zig");
 pub const Radio = @import("Radio.zig");
+pub const Menu = @import("Menu.zig");
+pub const Avatar = @import("Avatar.zig");
+pub const Badge = @import("Badge.zig");
 pub const Snippet = @import("Snippet.zig");
 pub const SwitchComponent = @import("SwitchComponent.zig").Switch;
 pub const TextFieldStruct = @import("Field_1.zig");
@@ -207,6 +210,7 @@ pub fn new() void {
     Carousel.new();
     Checkbox.new();
     Radio.new();
+    Menu.new();
     TextFieldStruct.new();
     Copy.new();
 }
