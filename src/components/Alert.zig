@@ -34,6 +34,12 @@ content: ?*const fn (*Alert) void = null,
 closed: bool = true,
 background: Vapor.Types.Color = .palette(.background),
 border: Vapor.Types.Border = .round(.palette(.border_color_light), .all(12)),
+/// Around the content.
+padding: Vapor.Types.Padding = .all(24),
+/// Its widest, in pixels; on a narrow screen it keeps 16px from each edge.
+max_width: f32 = 440,
+/// Over the page behind it.
+backdrop: Vapor.Types.Color = .transparentize(.black, 0.4),
 on_enter: ?*const fn (*Alert) void = null,
 /// Called when it is dismissed: Escape, or a click outside.
 on_close: ?*const fn () void = null,
@@ -106,6 +112,7 @@ pub fn render(alert: *Alert) void {
         .onMount(mount, .{alert})
         .onDestroy(destroy, .{alert})
         .blur(1)
+        .background(alert.backdrop)
         .size(.full)
         .pos(.tl(.px(0), .px(0), .fixed))
         .zIndex(999)
@@ -135,11 +142,12 @@ pub fn render(alert: *Alert) void {
             .tabIndex(-1)
             .inlineStyle("outline: none;", .{})
             .background(alert.background)
-            .shadow(.glow(30, .transparentize(.black, 0.05)))
+            .shadow(Vapor.Types.Shadow.init().dropSpread(0, 16, 48, 0, .transparentize(.black, 0.3)))
             .border(alert.border)
-            .width(.fit)
+            .padding(alert.padding)
+            .inlineStyle("width: min({d}px, calc(100vw - 32px)); box-sizing: border-box;", .{alert.max_width})
             .height(.fit)
-            .layout(.center)
+            .direction(.column)
             .zIndex(1000)
             .children({
             if (alert.content) |content| {
