@@ -431,8 +431,19 @@ pub fn Table(
         /// this specific table without affecting others of the same type.
         style: TableStyle = config.default_style,
 
+        /// The grid's active cell, which the arrow keys move: its row (an
+        /// index into the rows shown) and column (0 the checkbox, then the
+        /// columns).
         focused_row: ?usize = null,
         focused_col: ?usize = null,
+        /// The grid itself has the focus, not a control in it.
+        grid_focused: bool = false,
+        /// The active cell is marked: the grid got the focus from the
+        /// keyboard, or a key moved it. Not after a click.
+        mark_cell: bool = false,
+        /// The pointer went down on the grid; the focus that follows is a
+        /// click's.
+        pointer_down: bool = false,
         table_id: []const u8 = "data-table",
         total_width_percent: f32 = 100,
         row_background: ?Vapor.Types.Color = null,
@@ -706,6 +717,121 @@ pub fn Table(
 
         fn unregisterKeyboardNav(table: *Self) void {
             OverlayManager.unregister(.keydown, table);
+        }
+
+        const RowRange = struct { first: usize, end: usize };
+
+        /// The rows the arrow keys move through: the page shown, or all of
+        /// them.
+        fn navRange(table: *Self) RowRange {
+            return switch (table.display_mode) {
+                .paginated => .{
+                    .first = @min(table.current_page * table.per_page, table.filtered_data.items.len),
+                    .end = @min(table.current_page * table.per_page + table.per_page, table.filtered_data.items.len),
+                },
+                .all, .virtual => .{ .first = 0, .end = table.data.len },
+            };
+        }
+
+        fn rowAt(table: *Self, index: usize) *T {
+            return if (table.display_mode == .paginated) &table.filtered_data.items[index] else &table.data[index];
+        }
+
+        /// The active cell's row, if it is still one of the rows shown.
+        fn activeRow(table: *Self) ?usize {
+            const row = table.focused_row orelse return null;
+            const range = table.navRange();
+            return if (row >= range.first and row < range.end) row else null;
+        }
+
+        fn cellId(table: *Self, row: usize, col: usize) []const u8 {
+            return Vapor.fmtln("table-{x}-r{d}-c{d}", .{ @intFromPtr(table), row, col });
+        }
+
+        /// Marks the active cell: a ring inside its edge, where it takes no
+        /// room.
+        fn cellMark(table: *Self, row: usize, col: usize) ?Vapor.Types.Shadow {
+            if (!table.grid_focused or !table.mark_cell) return null;
+            if (table.activeRow() != row or table.focused_col != col) return null;
+            return Vapor.Types.Shadow.insetSpread(0, 0, 0, 2, Focus.color);
+        }
+
+        fn gridPointerDown(table: *Self, _: *Vapor.Event) void {
+            table.pointer_down = true;
+        }
+
+        fn gridFocus(table: *Self, _: *Vapor.Event) void {
+            table.grid_focused = true;
+            table.mark_cell = !table.pointer_down;
+            table.pointer_down = false;
+            if (table.activeRow() == null) {
+                const range = table.navRange();
+                table.focused_row = if (range.end > range.first) range.first else null;
+                table.focused_col = if (table_columns.len > 0) 1 else 0;
+            }
+        }
+
+        fn gridBlur(table: *Self, _: *Vapor.Event) void {
+            table.grid_focused = false;
+            table.pointer_down = false;
+        }
+
+        /// The arrow keys move the active cell; Home and End go to the first
+        /// and last column, with Ctrl to the first and last row; Page Up and
+        /// Page Down turn the page. Space selects the row, Enter opens it.
+        fn gridKey(table: *Self, evt: *Vapor.Event) void {
+            // A control inside the grid has the focus; the key is its own.
+            if (!table.grid_focused) return;
+            var range = table.navRange();
+            if (range.end <= range.first) return;
+            // usize: @min with a comptime bound would narrow the type.
+            const last_col: usize = table_columns.len;
+            var row: usize = table.activeRow() orelse range.first;
+            var col: usize = @min(table.focused_col orelse 1, last_col);
+            const key = evt.key();
+            const ctrl = evt.ctrlKey() or evt.metaKey();
+
+            if (eql(key, "ArrowDown")) {
+                row = @min(row + 1, range.end - 1);
+            } else if (eql(key, "ArrowUp")) {
+                row = if (row > range.first) row - 1 else row;
+            } else if (eql(key, "ArrowRight")) {
+                col = @min(col + 1, last_col);
+            } else if (eql(key, "ArrowLeft")) {
+                col = if (col > 0) col - 1 else col;
+            } else if (eql(key, "Home")) {
+                if (ctrl) row = range.first else col = 0;
+            } else if (eql(key, "End")) {
+                if (ctrl) row = range.end - 1 else col = last_col;
+            } else if (eql(key, "PageDown") or eql(key, "PageUp")) {
+                const down = eql(key, "PageDown");
+                if (table.display_mode == .paginated) {
+                    if (down and table.current_page + 1 < table.pageCount()) table.current_page += 1;
+                    if (!down and table.current_page > 0) table.current_page -= 1;
+                    range = table.navRange();
+                    row = @min(range.first + row % table.per_page, range.end - 1);
+                } else if (down) {
+                    row = @min(row + table.per_page, range.end - 1);
+                } else {
+                    row = if (row >= range.first + table.per_page) row - table.per_page else range.first;
+                }
+            } else if (eql(key, " ")) {
+                table.selectRow(table.rowAt(row));
+            } else if (eql(key, "Enter")) {
+                if (table.on_row_click) |cb| cb(table.rowAt(row));
+            } else {
+                return;
+            }
+            evt.preventDefault();
+            table.focused_row = row;
+            table.focused_col = col;
+            table.mark_cell = true;
+            if (table.display_mode == .virtual) table.virtual_list.reveal(row);
+            Vapor.scrollIntoView(table.cellId(row, col), .{ .block = .nearest });
+        }
+
+        fn eql(a: []const u8, b: []const u8) bool {
+            return std.mem.eql(u8, a, b);
         }
 
         fn handleDynamicTableKeyPress(table: *Self, evt: *Vapor.Event) void {
@@ -990,8 +1116,13 @@ pub fn Table(
         }
 
         fn nextPage(table: *Self) void {
-            if (table.current_page > table.data.len - 1) return;
+            if (table.current_page + 1 >= table.pageCount()) return;
             table.current_page += 1;
+        }
+
+        /// Pages of `per_page` rows the filtered rows fill; at least one.
+        fn pageCount(table: *Self) usize {
+            return @max(1, (table.filtered_data.items.len + table.per_page - 1) / table.per_page);
         }
 
         // =================================================================
@@ -1086,12 +1217,12 @@ pub fn Table(
                 const value = @field(row, name);
 
                 const col_i = j + 1;
-                const id = Vapor.fmtln("table-column-row-{d}-col-{d}", .{ actual_index, col_i });
-                _ = id;
 
                 Box()
+                    .id(table.cellId(actual_index, col_i))
+                    .a11y(Vapor.Accessibility.init().setRole(.grid_cell))
+                    .shadow(table.cellMark(actual_index, col_i))
                     .width(.px(table.style.column_width))
-                    // .id(id)
                     .layout(.x_between_center)
                     .border(.{ .thickness = .{ .left = table.style.cell_divider_thickness }, .color = table.style.border_color })
                     .borderStyle(table.style.cell_divider_style)
@@ -1130,7 +1261,6 @@ pub fn Table(
 
                     if (table_columns.len - 1 == j) {
                         Box()
-                            .a11y(Vapor.Accessibility.init().setRole(.grid_cell))
                             // .width(.percent(table.style.action_width))
                             .layout(.right_center)
                             .height(.px(24))
@@ -1213,9 +1343,13 @@ pub fn Table(
                     .layout(.left_center).children({
                     // Checkbox
                     Box()
+                        .id(table.cellId(i, 0))
                         .a11y(Vapor.Accessibility.init().setRole(.grid_cell))
                         .padding(.horizontal(table.style.cell_padding_horizontal))
+                        .shadow(table.cellMark(i, 0))
                         .width(.px(table.style.checkbox_width))
+                        .height(.px(table.style.row_height))
+                        .layout(.left_center)
                         .children({
                         table.renderCheckbox(selectRow, .{ table, row }, is_selected);
                     });
@@ -1321,7 +1455,6 @@ pub fn Table(
                 // Data rows
                 for (items_to_render, 0..) |*row, i| {
                     const actual_index = table.current_page * table.per_page + i;
-                    const is_focused_row = table.focused_row == actual_index;
                     // Calling return here causes a crash
                     const is_selected = table.includes(row.id);
 
@@ -1352,11 +1485,13 @@ pub fn Table(
                             .layout(.left_center).children({
                             // Checkbox
                             Box()
+                                .id(table.cellId(actual_index, 0))
                                 .a11y(Vapor.Accessibility.init().setRole(.grid_cell))
                                 .padding(.horizontal(table.style.cell_padding_horizontal))
-                                .tabIndex(if (is_focused_row and table.focused_col == 0) 0 else -1)
-                                .focusVisible(Focus.inset())
+                                .shadow(table.cellMark(actual_index, 0))
                                 .width(.px(table.style.checkbox_width))
+                                .height(.px(table.style.row_height))
+                                .layout(.left_center)
                                 .children({
                                 table.renderCheckbox(selectRow, .{ table, row }, is_selected);
                             });
@@ -1495,7 +1630,7 @@ pub fn Table(
 
         fn Pagination(table: *Self) void {
             if (table.filtered_data.items.len == 0) return;
-            const page_count: f32 = @floatFromInt(@divTrunc(table.filtered_data.items.len, table.per_page) + 1);
+            const page_count: f32 = @floatFromInt(table.pageCount());
             const float_page: f32 = @floatFromInt(table.current_page);
 
             Box()
@@ -1735,11 +1870,15 @@ pub fn Table(
                     .a11y(Vapor.Accessibility.init()
                         .setRole(.grid)
                         .setLabel(table.file_name)
-                        .setActiveDescendant(if (table.focused_row) |row|
-                        Vapor.fmtln("row-{d}-col-{d}", .{ row, table.focused_col orelse 0 })
+                        .setActiveDescendant(if (table.grid_focused) if (table.activeRow()) |row|
+                        table.cellId(row, table.focused_col orelse 0)
                     else
-                        null))
+                        null else null))
                     .tabIndex(0)
+                    .onEvent(.keydown, gridKey, .{table})
+                    .onEvent(.pointerdown, gridPointerDown, .{table})
+                    .onEvent(.focus, gridFocus, .{table})
+                    .onEvent(.blur, gridBlur, .{table})
                     .focusVisible(Focus.ring())
                     .children({
                     Stack()

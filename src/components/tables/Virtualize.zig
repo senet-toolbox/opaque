@@ -190,6 +190,17 @@ pub fn VirtualList(comptime T: type) type {
             // The position is handled in the render loop below.
         }
 
+        /// Scrolls the list just enough to show the item at `index`.
+        pub fn reveal(self: *Self, index: usize) void {
+            const top = @as(f32, @floatFromInt(index)) * self.item_height;
+            const scroll_top = self.inner_container.scrollTop();
+            if (top < scroll_top) {
+                self.inner_container.scrollToTop(top);
+            } else if (top + self.item_height > scroll_top + self.container_height) {
+                self.inner_container.scrollToTop(top + self.item_height - self.container_height);
+            }
+        }
+
         pub fn mount(self: *Self) void {
             if (self.initial_index > 0) {
                 const scroll_to = @as(f32, @floatFromInt(self.initial_index)) * self.item_height;
