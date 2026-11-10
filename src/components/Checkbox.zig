@@ -1,4 +1,5 @@
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const std = @import("std");
 const Row = Vapor.Row;
 const Button = Vapor.Button;
@@ -62,6 +63,7 @@ pub fn create(uuid: []const u8, on_change: anytype, args: anytype) Vapor.Builder
     const background_color = if (switch_options.active) active_background else inactive_background;
     var button: Vapor.Builder(.pure) = undefined;
     button = Button(toggleWithActive, .{ switch_options, on_change, args })
+        .focusVisible(Focus.ring())
         .a11y(.checkbox(switch_options.active))
         .id(uuid)
         .onDestroy(destroy, .{switch_options})
@@ -91,6 +93,7 @@ pub fn render(aria_label: []const u8, on_change: anytype, args: anytype) void {
         .onDestroy(destroy, .{switch_options})
         .children({
         Button(toggle, .{ switch_options, on_change, args })
+            .focusVisible(Focus.ring())
             .a11y(.checkbox(switch_options.active))
             .ariaLabel(aria_label)
             .width(.px(20))

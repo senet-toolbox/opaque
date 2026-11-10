@@ -1,4 +1,5 @@
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const std = @import("std");
 const Box = Vapor.Box;
 const Button = Vapor.Button;
@@ -115,7 +116,7 @@ pub fn Switch(on_change: anytype, args: anytype) SwitchComponent {
         break :blk switch_options;
     };
 
-    const button = Button(toggle, .{ switch_options, on_change, args });
+    const button = Button(toggle, .{ switch_options, on_change, args }).focusVisible(Focus.ring());
 
     return SwitchComponent{
         .container = container,

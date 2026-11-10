@@ -1,5 +1,6 @@
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Text = Vapor.Text;
 const Row = Vapor.Row;
 const Button = Vapor.Button;
@@ -244,6 +245,7 @@ pub fn Select(comptime T: type) type {
         fn renderItem(select: *Self, item: *Item) void {
             if (!item._is_shown) return;
             Button(selectItem, .{ select, item })
+                .focusVisible(Focus.inset())
                 .a11y(Vapor.Accessibility.init().setRole(.option).setSelected(item.is_selected))
                 .width(.percent(100))
                 .height(select.height)
@@ -401,6 +403,7 @@ pub fn Select(comptime T: type) type {
                 .ref(binded_trigger).children({
                 if (select.trigger_component) |trigger| {
                     Button(toggleWithBindedTriggerVPCtx, .{ select, binded_trigger, callback, args })
+                        .focusVisible(Focus.ring())
                         .a11y(select.triggerA11y())
                         .background(.transparent)
                         .width(.percent(100))
@@ -410,6 +413,7 @@ pub fn Select(comptime T: type) type {
                     });
                 } else {
                     Button(toggleWithBindedTrigger, .{ select, binded_trigger })
+                        .focusVisible(Focus.ring())
                         .a11y(select.triggerA11y())
                         .width(.percent(100))
                         .border(if (select._closed) border else selected_border)
@@ -444,6 +448,7 @@ pub fn Select(comptime T: type) type {
                     // THIS IS THE NEW WAY i switch toggleWithBindedTriggerVP to toggleWithBindedTrigger
                     ////////////////////////////////////////////////////////////////////////////////////
                     Button(toggleWithBindedTriggerVP, .{ select, binded_trigger })
+                        .focusVisible(Focus.ring())
                         .a11y(select.triggerA11y())
                         .background(.transparent)
                         .width(.percent(100))
@@ -453,6 +458,7 @@ pub fn Select(comptime T: type) type {
                     });
                 } else {
                     Button(toggleWithBindedTrigger, .{ select, binded_trigger })
+                        .focusVisible(Focus.ring())
                         .a11y(select.triggerA11y())
                         .width(.percent(100))
                         .height(select.height)

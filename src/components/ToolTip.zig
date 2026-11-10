@@ -1,5 +1,6 @@
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Text = Vapor.Text;
 const Row = Vapor.Row;
 const ButtonCtx = Vapor.Button;
@@ -396,6 +397,7 @@ pub fn Trigger(tooltip: *ToolTip, trigger: anytype, args: anytype) *ToolTip {
         // A custom trigger is reachable from the keyboard: focus shows the
         // tooltip, as hover does.
         .tabIndex(if (tooltip.options.trigger_focusable) -1 else 0)
+        .focusVisible(Focus.ring())
         .onEvent(.pointerenter, onHover, .{tooltip})
         .onEvent(.pointerleave, onLeave, .{tooltip})
         .onEvent(.focusin, onHover, .{tooltip})
@@ -510,6 +512,7 @@ pub fn simpleWithPosition(title: []const u8, content: []const u8, position: Vapo
     const custom = tooltip.options.trigger != null or tooltip.options.trigger_ctx != null;
     hover_box
         .tabIndex(if (custom and !tooltip.options.trigger_focusable) 0 else -1)
+        .focusVisible(Focus.ring())
         .onEvent(.pointerenter, onHover, .{tooltip})
         .onEvent(.pointerleave, onLeave, .{tooltip})
         .onEvent(.focusin, onHover, .{tooltip})
@@ -524,6 +527,7 @@ pub fn simpleWithPosition(title: []const u8, content: []const u8, position: Vapo
         } else {
             Row()
                 .tabIndex(0)
+                .focusVisible(Focus.ring())
                 .padding(.xy(12, 4))
                 .background(background)
                 .duration(100)
@@ -577,6 +581,7 @@ pub fn render(tooltip_options: Options) void {
     const custom = tooltip.options.trigger != null or tooltip.options.trigger_ctx != null;
     hover_box
         .tabIndex(if (custom and !tooltip.options.trigger_focusable) 0 else -1)
+        .focusVisible(Focus.ring())
         .onEvent(.pointerenter, onHover, .{tooltip})
         .onEvent(.pointerleave, onLeave, .{tooltip})
         .onEvent(.focusin, onHover, .{tooltip})
@@ -591,6 +596,7 @@ pub fn render(tooltip_options: Options) void {
         } else {
             Row()
                 .tabIndex(0)
+                .focusVisible(Focus.ring())
                 .padding(.xy(12, 4))
                 .background(background)
                 .duration(100)

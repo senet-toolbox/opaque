@@ -1,10 +1,12 @@
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 
 var background: Vapor.Types.Color = .transparentize(.hex("#F5F5F5"), 0.2);
 var border: Vapor.Types.Border = .round(.palette(.border_color_light), .all(12));
 
 pub fn Button(func: anytype, args: anytype) Vapor.Builder(.pure) {
     return Vapor.Button(func, args).layout(.x_between_center)
+        .focusVisible(Focus.ring())
         .spacing(8).padding(.xy(10, 8))
         .width(.fit).height(.fit)
         .border(border).background(background)

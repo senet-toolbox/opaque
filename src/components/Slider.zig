@@ -8,6 +8,7 @@
 
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Box = Vapor.Box;
 
 const handle_size = 18;
@@ -160,6 +161,7 @@ pub fn render(options: Slider) void {
                 .children({});
             Box()
                 .a11y(Vapor.Accessibility.slider(state.value, options.min, options.max).setLabel(options.label))
+                .focusVisible(Focus.ring())
                 .tabIndex(0)
                 .onEvent(.keydown, keyDown, .{state})
                 .pos(.{ .type = .absolute, .top = .px(-6) })

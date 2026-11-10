@@ -12,6 +12,7 @@
 
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Box = Vapor.Box;
 const Button = Vapor.Button;
 
@@ -35,6 +36,7 @@ pub const AccordionItem = struct {
             .direction(.column)
             .children({
             Button(toggle, .{item})
+                .focusVisible(Focus.ring())
                 .a11y(Vapor.Accessibility.init().setExpanded(item.is_open))
                 .width(.percent(100))
                 .padding(.vertical(8))

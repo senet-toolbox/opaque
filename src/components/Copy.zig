@@ -1,4 +1,5 @@
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const std = @import("std");
 
 var copies: std.AutoHashMap(u32, bool) = undefined;
@@ -17,6 +18,7 @@ pub fn snippet(text: []const u8) void {
         break :blk copies.getPtr(hash) orelse unreachable;
     };
     Vapor.Button(copy, .{ text, copied })
+        .focusVisible(Focus.ring())
         .layout(.x_between_center)
         .padding(.all(16))
         .background(.palette(.background))

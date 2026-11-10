@@ -1,4 +1,5 @@
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Box = Vapor.Box;
 const Text = Vapor.Text;
 const TextFmt = Vapor.TextFmt;
@@ -296,6 +297,7 @@ pub fn render(date_picker: *DatePicker) void {
             .layout(.x_between_center)
             .children({
             Button(prev, .{date_picker})
+                .focusVisible(Focus.ring())
                 .ariaLabel("Previous Month")
                 .background(date_picker.background)
                 .cursor(.pointer)
@@ -309,6 +311,7 @@ pub fn render(date_picker: *DatePicker) void {
                 date_picker._viewed_date.year,
             }).end();
             Button(next, .{date_picker})
+                .focusVisible(Focus.ring())
                 .ariaLabel("Next Month")
                 .background(date_picker.background)
                 .cursor(.pointer)
@@ -366,6 +369,7 @@ pub fn render(date_picker: *DatePicker) void {
                     // darken a little under the pointer.
                     const color: Vapor.Types.Color = if (chosen) date_picker.tint else .transparentize(.black, 0.05);
                     Button(selectDate, .{ date_picker, date })
+                        .focusVisible(Focus.inset())
                         // Named by its full date, and pressed when chosen.
                         .a11y(Vapor.Accessibility.init().setPressed(if (date_picker.isSelected(date)) .true_val else .false_val))
                         .ariaLabel(Vapor.fmtln("{s} {d}, {d}", .{ DateTime.monthString(date.month), date.day, date.year }))

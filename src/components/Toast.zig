@@ -1,5 +1,6 @@
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Text = Vapor.Text;
 const TextArea = Vapor.TextArea;
 const Stack = Vapor.Stack;
@@ -494,6 +495,7 @@ fn renderToast(toast: *Toast, index: usize, position: StackPosition) void {
 
         // 3. Close Button
         Button(dismiss, .{toast.id})
+            .focusVisible(Focus.ring())
             .ariaLabel("Dismiss notification")
             .class("toast-close")
             .cursor(.pointer)

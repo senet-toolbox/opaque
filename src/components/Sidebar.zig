@@ -1,5 +1,6 @@
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Box = Vapor.Box;
 const Text = Vapor.Text;
 const ButtonCtx = Vapor.Button;
@@ -132,6 +133,7 @@ fn LargeMenu(sidebar: *SideBar) void {
                 .size(.hw(.fit, .percent(100)))
                 .children({
                 CtxButton(onGroupClick, .{ sidebar, group })
+                    .focusVisible(Focus.inset())
                     .a11y(Vapor.Accessibility.init().setExpanded(group.show))
                     .style(Styles.GroupStyle)
                     .children({
@@ -189,6 +191,7 @@ fn LargeMenu(sidebar: *SideBar) void {
                                 .radius(.all(99))
                                 .width(.px(3)).height(.px(3)).children({});
                             ButtonCtx(onItemClick, .{ sidebar, item })
+                                .focusVisible(Focus.inset())
                                 .a11y(Vapor.Accessibility.init().setPressed(if (std.mem.eql(u8, current_path, item.link)) .true_val else .false_val))
                                 .tabIndex(if (group.show) 0 else -1)
                                 .style(&.{
@@ -259,6 +262,7 @@ fn LargeMenu(sidebar: *SideBar) void {
                         .radius(.all(99))
                         .width(.px(3)).height(.px(3)).children({});
                     ButtonCtx(onItemClick, .{ sidebar, item })
+                        .focusVisible(Focus.inset())
                         .a11y(Vapor.Accessibility.init().setPressed(if (active) .true_val else .false_val))
                         .style(&.{
                             .visual = Vapor.Types.Visual{

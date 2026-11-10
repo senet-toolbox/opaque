@@ -39,6 +39,7 @@ pub const Radio = @import("Radio.zig");
 pub const Menu = @import("Menu.zig");
 pub const Avatar = @import("Avatar.zig");
 pub const Badge = @import("Badge.zig");
+pub const Focus = @import("Focus.zig");
 pub const Snippet = @import("Snippet.zig");
 pub const SwitchComponent = @import("SwitchComponent.zig").Switch;
 pub const TextFieldStruct = @import("Field_1.zig");

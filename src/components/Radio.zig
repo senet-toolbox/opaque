@@ -14,6 +14,7 @@
 //! arrow keys move the choice and the focus, wrapping round.
 
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const std = @import("std");
 const Row = Vapor.Row;
 const Stack = Vapor.Stack;
@@ -124,6 +125,7 @@ pub fn Item(value: []const u8, label: []const u8) void {
     state.values.append(Vapor.frame.arena(), value) catch {};
 
     Button(select, .{ state, value })
+        .focusVisible(Focus.ring())
         .id(itemId(state, value_hash))
         .a11y(Vapor.Accessibility.init()
             .setRole(.radio)

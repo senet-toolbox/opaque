@@ -16,6 +16,7 @@
 
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Row = Vapor.Row;
 const Stack = Vapor.Stack;
 const Text = Vapor.Text;
@@ -275,6 +276,7 @@ fn renderArrows(c: *Carousel) void {
         )
         .children({
         Button(goPrev, .{c})
+            .focusVisible(Focus.ring())
             .a11y(Vapor.Accessibility.init().setDisabled(at_first))
             .ariaLabel("Previous slide")
             .opacity(if (at_first) 0.3 else 1)
@@ -288,6 +290,7 @@ fn renderArrows(c: *Carousel) void {
             Text("‹").font(24, 700, .white).fontFamily("IBM Plex Sans,monospace").end();
         });
         Button(goNext, .{c})
+            .focusVisible(Focus.ring())
             .a11y(Vapor.Accessibility.init().setDisabled(at_last))
             .ariaLabel("Next slide")
             .opacity(if (at_last) 0.3 else 1)
@@ -308,6 +311,7 @@ fn renderDots(c: *Carousel) void {
         for (0..c.options.count) |i| {
             const active = (i == c.index);
             Button(goTo, .{ c, i })
+                .focusVisible(Focus.ring())
                 // The dot for the slide on show reads as pressed.
                 .a11y(Vapor.Accessibility.init().setPressed(if (active) .true_val else .false_val))
                 .ariaLabel(Vapor.fmtln("Go to slide {d}", .{i + 1}))

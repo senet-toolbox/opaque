@@ -1,5 +1,6 @@
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Text = Vapor.Text;
 const Box = Vapor.Box;
 const Button = Vapor.Button;
@@ -85,6 +86,7 @@ pub fn render(command_palette: *CommandPalette) void {
             .border(.round(.palette(.border_color_light), .all(12)))
             .children({
             Button(toggle, .{command_palette})
+                .focusVisible(Focus.ring())
                 .pos(.relative)
                 .width(.percent(100))
                 .padding(.xy(12, 10))

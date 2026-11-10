@@ -1,5 +1,6 @@
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("../Focus.zig");
 const Box = Vapor.Box;
 const Text = Vapor.Text;
 const Svg = @import("Svg.zig").Svg;
@@ -2446,6 +2447,7 @@ pub const Chart = struct {
             for (self.legend_items, 0..) |item, k| {
                 const shown = self.isShown(k);
                 Vapor.Button(toggleItem, .{ self, k })
+                    .focusVisible(Focus.inset())
                     .attribute("aria-pressed", if (shown) "true" else "false")
                     .onEvent(.pointerenter, focusItem, .{ self, k })
                     .onEvent(.pointerleave, unfocusItem, .{self})
@@ -2624,6 +2626,7 @@ pub const Chart = struct {
             // zoom box. Top right and above the tooltip, where charts keep it.
             if (self.pre_zoom_axes != null) {
                 Vapor.Button(resetZoom, .{self})
+                    .focusVisible(Focus.ring())
                     .ariaLabel("Reset zoom")
                     .pos(.tr(.px(@floatFromInt(self.config.margin.top + 8)), .px(@floatFromInt(self.config.margin.right + 8)), .absolute))
                     .zIndex(1001)

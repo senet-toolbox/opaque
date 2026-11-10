@@ -1,4 +1,5 @@
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const std = @import("std");
 const Opaque = @import("Opaque.zig");
 const Button = Vapor.Button;
@@ -166,6 +167,7 @@ pub fn Trigger(tabs: *Tabs, trigger_fn: *const fn (*Tabs, []const u8, bool) void
         for (tabs.names, 0..) |name, i| {
             const is_selected = (active_idx == i);
             Button(switchTabs, .{ tabs, name, active_idx })
+                .focusVisible(Focus.inset())
                 .id(tabId(tabs, name))
                 .a11y(Vapor.Accessibility.init().setRole(.tab).setSelected(is_selected))
                 .tabIndex(if (is_selected) 0 else -1)
@@ -195,6 +197,7 @@ fn NavBtn(ctx: ?*anyopaque) void {
 
     const is_selected = (active_idx == i);
     Button(switchTabs, .{ tabs, name, active_idx })
+        .focusVisible(Focus.inset())
         .id(tabId(tabs, name))
         .a11y(Vapor.Accessibility.init().setRole(.tab).setSelected(is_selected))
         .tabIndex(if (is_selected) 0 else -1)

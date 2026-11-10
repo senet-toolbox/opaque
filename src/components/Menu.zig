@@ -19,6 +19,7 @@
 
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Box = Vapor.Box;
 const Stack = Vapor.Stack;
 const Text = Vapor.Text;
@@ -234,6 +235,7 @@ pub fn renderWith(menu: *Menu, comptime trigger_fn: anytype, args: anytype) void
 
 fn button(menu: *Menu) Vapor.Builder(.pure) {
     return Button(toggle, .{menu})
+        .focusVisible(Focus.ring())
         .ref(&menu.trigger)
         .a11y(Vapor.Accessibility.init()
         .setHasPopup(.menu)

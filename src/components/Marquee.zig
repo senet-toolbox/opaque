@@ -1,5 +1,6 @@
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const Row = Vapor.Row;
 const Stack = Vapor.Stack;
 const Text = Vapor.Text;
@@ -96,6 +97,7 @@ pub fn render(options: Options) *Marquee {
         .class("marquee-viewport")
         .a11y(Vapor.Accessibility.init().setRole(.region).setLabel(options.label))
         .tabIndex(0)
+        .focusVisible(Focus.ring())
         .width(.percent(100))
         .height(.percent(100))
         .center()

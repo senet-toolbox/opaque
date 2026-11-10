@@ -1,4 +1,5 @@
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const std = @import("std");
 const Row = Vapor.Row;
 const Text = Vapor.Text;
@@ -29,6 +30,7 @@ fn toggleIcon(snippet: *Snippet) void {
 
 pub fn code(snippet: *Snippet, text: []const u8) void {
     Button(copy, .{ snippet, text })
+        .focusVisible(Focus.ring())
         .style(&.{
             .visual = .{
                 .border = .thin(.transparentize(.black, 0.1)),

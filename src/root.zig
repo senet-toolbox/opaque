@@ -52,6 +52,8 @@ pub const Radio = Components.Radio;
 pub const Menu = Components.Menu;
 pub const Avatar = Components.Avatar;
 pub const Badge = Components.Badge;
+/// The ring every component shows under keyboard focus: `Focus.color`.
+pub const Focus = Components.Focus;
 
 pub const new = Components.new;
 pub const initAnimations = Components.initAnimations;

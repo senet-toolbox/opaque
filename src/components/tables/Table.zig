@@ -34,6 +34,7 @@
 ///!   ```
 const std = @import("std");
 const Vapor = @import("vapor");
+const Focus = @import("../Focus.zig");
 const Text = Vapor.Text;
 const Box = Vapor.Row;
 const Button = Vapor.Button;
@@ -1054,6 +1055,7 @@ pub fn Table(
         /// Render a checkbox used for row and header selection.
         fn renderCheckbox(table: *Self, func: anytype, args: anytype, is_active: bool) void {
             Button(func, args)
+                .focusVisible(Focus.ring())
                 .a11y(Vapor.Accessibility.checkbox(is_active).setLabel("Select row"))
                 .width(.px(20))
                 .height(.px(20))
@@ -1252,6 +1254,7 @@ pub fn Table(
         fn renderContextAction(table: *Self, comptime on_click: anytype, label: []const u8, icon: Vapor.IconTokens) void {
             const icon_token: Vapor.IconTokens = if (table.context_menu.copied) .check else icon;
             Button(on_click, .{table})
+                .focusVisible(Focus.inset())
                 .pointer()
                 .width(.percent(100))
                 .padding(.xy(8, 6))
@@ -1352,6 +1355,7 @@ pub fn Table(
                                 .a11y(Vapor.Accessibility.init().setRole(.grid_cell))
                                 .padding(.horizontal(table.style.cell_padding_horizontal))
                                 .tabIndex(if (is_focused_row and table.focused_col == 0) 0 else -1)
+                                .focusVisible(Focus.inset())
                                 .width(.px(table.style.checkbox_width))
                                 .children({
                                 table.renderCheckbox(selectRow, .{ table, row }, is_selected);
@@ -1370,6 +1374,7 @@ pub fn Table(
         /// Render a "⏎ to save" / "esc to dismiss" hint button.
         fn renderKeyHint(table: *Self, action: anytype, _: ?*const Vapor.IconTokens, label: []const u8) void {
             Button(action, .{table})
+                .focusVisible(Focus.ring())
                 .layout(.left_center)
                 .spacing(8)
                 .children({
@@ -1436,6 +1441,7 @@ pub fn Table(
                         .onEvent(.input, search, .{table})
                         .end();
                     Button(clearText, .{table})
+                        .focusVisible(Focus.ring())
                         .ariaLabel("Search Filter")
                         .background(.transparent).pointer().padding(.all(4))
                         .children({
@@ -1467,6 +1473,7 @@ pub fn Table(
                 for (values) |value| {
                     const active = table.enum_filters.get(fieldToString(value)) != null;
                     Button(handleFilter, .{ table, FT, value })
+                        .focusVisible(Focus.inset())
                         .ariaLabel("Select Filter")
                         .width(.percent(100)).height(.px(36))
                         .background(if (active) table.style.tint else .transparent)
@@ -1506,6 +1513,7 @@ pub fn Table(
                 Box().spacing(16).children({
                     if (float_page > 0) {
                         Button(prevPage, .{table})
+                            .focusVisible(Focus.ring())
                             .ariaLabel("Go to previous page")
                             .background(.transparent).cursor(.pointer)
                             .children({
@@ -1517,6 +1525,7 @@ pub fn Table(
                     }
                     if (float_page < page_count - 1) {
                         Button(nextPage, .{table})
+                            .focusVisible(Focus.ring())
                             .ariaLabel("Go to next page")
                             .background(.transparent).cursor(.pointer)
                             .children({
@@ -1532,6 +1541,7 @@ pub fn Table(
 
         fn CommonToggleFilter(func: anytype, args: anytype) Vapor.Builder(.pure) {
             return Button(func, args)
+                .focusVisible(Focus.ring())
                 .ariaLabel("Toggle Filter")
                 .cursor(.pointer)
                 .border(.round(.transparent, .all(4)))
@@ -1675,6 +1685,7 @@ pub fn Table(
             action: fn (*Self) void,
         ) void {
             Button(action, .{table})
+                .focusVisible(Focus.inset())
                 .ariaLabel(label)
                 .width(.expand)
                 .padding(.xy(4, 8))
@@ -1729,6 +1740,7 @@ pub fn Table(
                     else
                         null))
                     .tabIndex(0)
+                    .focusVisible(Focus.ring())
                     .children({
                     Stack()
                         .height(height)
@@ -1763,6 +1775,7 @@ pub fn Table(
                                             .children({
                                             const all_active = table.selection_mode == .all;
                                             Button(selectAll, .{table})
+                                                .focusVisible(Focus.ring())
                                                 .width(.px(20)).height(.px(20))
                                                 .cursor(.pointer).duration(table.style.hover_duration).hoverScale()
                                                 .a11y(Vapor.Accessibility.checkbox(all_active).setLabel("Select all"))

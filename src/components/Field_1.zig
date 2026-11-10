@@ -3,6 +3,7 @@
 // ============================================================================
 
 const Vapor = @import("vapor");
+const Focus = @import("Focus.zig");
 const std = @import("std");
 const Box = Vapor.Box;
 const Text = Vapor.Text;
@@ -1004,6 +1005,7 @@ pub fn render(field: *TextField) void {
                     .end();
 
                 Button(toggleDatePicker, .{date_config})
+                    .focusVisible(Focus.ring())
                     .pos(.tr(.px(0), .px(0), .absolute))
                     .width(.px(32))
                     .height(.px(32))
@@ -1319,6 +1321,7 @@ pub fn Component(field: *TextField, component: ?*const fn (*TextField) Vapor.Bui
                         .end();
 
                     Button(toggleDatePicker, .{date_config})
+                        .focusVisible(Focus.ring())
                         .pos(.tr(.px(0), .px(0), .absolute))
                         .width(.px(32))
                         .height(.px(32))
