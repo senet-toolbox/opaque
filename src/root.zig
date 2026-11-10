@@ -57,6 +57,8 @@ pub const Focus = Components.Focus;
 pub const Breadcrumb = Components.Breadcrumb;
 pub const Pagination = Components.Pagination;
 pub const Skeleton = Components.Skeleton;
+pub const Segmented = Components.Segmented;
+pub const CodeInput = Components.CodeInput;
 
 pub const new = Components.new;
 pub const initAnimations = Components.initAnimations;
@@ -66,4 +68,5 @@ test {
     _ = @import("components/Avatar.zig");
     _ = @import("components/Badge.zig");
     _ = @import("components/Pagination.zig");
+    _ = @import("components/CodeInput.zig");
 }

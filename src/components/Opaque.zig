@@ -43,6 +43,8 @@ pub const Focus = @import("Focus.zig");
 pub const Breadcrumb = @import("Breadcrumb.zig");
 pub const Pagination = @import("Pagination.zig");
 pub const Skeleton = @import("Skeleton.zig");
+pub const Segmented = @import("Segmented.zig");
+pub const CodeInput = @import("CodeInput.zig");
 pub const Snippet = @import("Snippet.zig");
 pub const SwitchComponent = @import("SwitchComponent.zig").Switch;
 pub const TextFieldStruct = @import("Field_1.zig");
@@ -216,6 +218,7 @@ pub fn new() void {
     Radio.new();
     Menu.new();
     Skeleton.new();
+    CodeInput.new();
     TextFieldStruct.new();
     Copy.new();
 }
