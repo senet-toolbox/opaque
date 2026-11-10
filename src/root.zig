@@ -54,6 +54,9 @@ pub const Avatar = Components.Avatar;
 pub const Badge = Components.Badge;
 /// The ring every component shows under keyboard focus: `Focus.color`.
 pub const Focus = Components.Focus;
+pub const Breadcrumb = Components.Breadcrumb;
+pub const Pagination = Components.Pagination;
+pub const Skeleton = Components.Skeleton;
 
 pub const new = Components.new;
 pub const initAnimations = Components.initAnimations;
@@ -62,4 +65,5 @@ test {
     _ = @import("components/charts/Chart.zig");
     _ = @import("components/Avatar.zig");
     _ = @import("components/Badge.zig");
+    _ = @import("components/Pagination.zig");
 }
