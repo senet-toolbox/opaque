@@ -4,6 +4,7 @@ const Text = Vapor.Text;
 const Box = Vapor.Box;
 const ButtonCtx = Vapor.Button;
 const Button = Vapor.Button;
+const Focus = @import("Focus.zig");
 const TextFmt = Vapor.TextFmt;
 const TextField = Vapor.TextField;
 const Stack = Vapor.Stack;
@@ -132,6 +133,7 @@ pub fn ComboBox(comptime T: type) type {
             if (!item._is_shown) return;
             ButtonCtx(selectItem, .{ combobox, item })
                 .a11y(Vapor.Accessibility.init().setRole(.option).setSelected(item.is_selected))
+                .focusVisible(Focus.inset())
                 .width(.percent(100))
                 .height(.px(36))
                 // .background(if (item.is_selected) selected_background else background)
@@ -277,6 +279,7 @@ pub fn ComboBox(comptime T: type) type {
                 if (combobox.trigger_component) |trigger| {
                     ButtonCtx(toggleWithBindedTriggerCtx, .{ combobox, binded_trigger, ctx })
                         .a11y(combobox.triggerA11y())
+                        .focusVisible(Focus.ring())
                         .background(.transparent)
                         .width(.percent(100))
                         .height(.percent(100))
@@ -286,6 +289,7 @@ pub fn ComboBox(comptime T: type) type {
                 } else {
                     ButtonCtx(toggleWithBindedTrigger, .{ combobox, binded_trigger })
                         .a11y(combobox.triggerA11y())
+                        .focusVisible(Focus.ring())
                         .width(.percent(100))
                         .border(if (combobox._closed) border else selected_border)
                         .background(background)
@@ -342,6 +346,7 @@ pub fn ComboBox(comptime T: type) type {
                 if (combobox.trigger_component) |trigger| {
                     ButtonCtx(toggleWithBindedTrigger, .{ combobox, binded_trigger })
                         .a11y(combobox.triggerA11y())
+                        .focusVisible(Focus.ring())
                         .background(.transparent)
                         .width(.percent(100))
                         .height(.percent(100))
@@ -351,6 +356,7 @@ pub fn ComboBox(comptime T: type) type {
                 } else {
                     ButtonCtx(toggleWithBindedTrigger, .{ combobox, binded_trigger })
                         .a11y(combobox.triggerA11y())
+                        .focusVisible(Focus.ring())
                         .width(.percent(100))
                         .border(if (combobox._closed) border else selected_border)
                         .background(background)
@@ -470,6 +476,7 @@ pub fn ComboBox(comptime T: type) type {
                                 .end();
                             ButtonCtx(clearText, .{combobox})
                                 .ariaLabel("Clear search")
+                                .focusVisible(Focus.ring())
                                 .background(.transparent)
                                 .pointer()
                                 .children({

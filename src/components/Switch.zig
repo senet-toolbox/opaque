@@ -2,6 +2,7 @@ const Vapor = @import("vapor");
 const std = @import("std");
 const Box = Vapor.Box;
 const Button = Vapor.Button;
+const Focus = @import("Focus.zig");
 
 var active_color: Vapor.Types.Color = .palette(.background);
 var inactive_color: Vapor.Types.Color = .palette(.background);
@@ -92,6 +93,7 @@ pub fn render(aria_label: []const u8, on_change: anytype, args: anytype) void {
         Button(toggle, .{ switch_options, on_change, args })
             .a11y(.switchToggle(switch_options.active))
             .ariaLabel(aria_label)
+            .focusVisible(Focus.ring())
             .width(.percent(100))
             .border(.{
                 .thickness = .none,

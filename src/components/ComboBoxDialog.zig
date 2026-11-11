@@ -4,6 +4,7 @@ const Text = Vapor.Text;
 const Box = Vapor.Box;
 const ButtonCtx = Vapor.Button;
 const Button = Vapor.Button;
+const Focus = @import("Focus.zig");
 const TextFmt = Vapor.TextFmt;
 const TextField = Vapor.TextField;
 const Stack = Vapor.Stack;
@@ -198,6 +199,7 @@ pub fn ComboBoxDialog(comptime T: type) type {
                 .id(optionId(index))
                 .a11y(.option(item.is_selected, @intCast(index + 1), @intCast(combobox.visible_items)))
                 .tabIndex(if (is_active) 0 else -1)
+                .focusVisible(Focus.inset())
                 .width(.percent(100))
                 .height(.px(44))
                 .background(background_color)
@@ -499,6 +501,7 @@ pub fn ComboBoxDialog(comptime T: type) type {
                             .end();
                         ButtonCtx(clearText, .{combobox})
                             .ariaLabel("Clear search")
+                            .focusVisible(Focus.ring())
                             .background(.transparent)
                             .pointer()
                             .children({
@@ -646,6 +649,8 @@ pub fn ComboBoxDialog(comptime T: type) type {
                 .zIndex(9999)
                 .children({
                 ButtonCtx(close, .{combobox})
+                    .ariaLabel("Close")
+                    .tabIndex(-1)
                     .size(.full)
                     .pos(.tl(.px(0), .px(0), .fixed))
                     .end();
