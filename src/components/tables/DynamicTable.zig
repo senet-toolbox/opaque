@@ -442,7 +442,13 @@ pub fn DynamicTable(
         filtered_data: Vapor.Array(DynamicRow) = undefined,
         per_page: usize = 10,
         selection_mode: SelectionMode = .none,
+        /// The rows picked, by their first column's text. Not in `arena`,
+        /// which `regenerate` resets: the set and its keys outlive a read of
+        /// new rows only until `regenerate` clears them.
         selection_set: std.HashMap(IdType, void, DynamicTableContext(IdType), std.hash_map.default_max_load_percentage) = undefined,
+        /// Holds `selection_set`'s keys: a number's text is written in the
+        /// frame's memory, and the set keeps it past the frame.
+        selection_arena: std.heap.ArenaAllocator = undefined,
         file_name: []const u8 = "content",
         display_mode: DisplayMode = .paginated,
         show_id_column: bool = false,
@@ -528,7 +534,8 @@ pub fn DynamicTable(
 
             table.data = data;
             table.filtered_data = Vapor.array(DynamicRow, .persist);
-            table.selection_set = std.HashMap(IdType, void, DynamicTableContext(IdType), 80).init(table.arena_allocator);
+            table.selection_set = std.HashMap(IdType, void, DynamicTableContext(IdType), 80).init(Vapor.lib.allocator_global);
+            table.selection_arena = std.heap.ArenaAllocator.init(Vapor.lib.allocator_global);
             table.row_width = table.computeRowWidth();
 
             table.search_box.init(table.arena_allocator);
@@ -565,6 +572,8 @@ pub fn DynamicTable(
         /// resetting it (avoids reallocation in the common case).
         pub fn regenerate(table: *Self, new_columns: []const DataColumn, data: []DynamicRow) void {
             if (!table.arena.reset(.retain_capacity)) std.log.err("Failed to reset arena", .{});
+            // New rows: a pick of the old ones means nothing now.
+            table.clearSelection();
             table.table_columns = new_columns;
             table.current_hovered_id = "";
             table.current_tapped_id = "";
@@ -744,6 +753,30 @@ pub fn DynamicTable(
         // Selection
         // =================================================================
 
+        /// Unpicks every row.
+        pub fn clearSelection(table: *Self) void {
+            table.selection_mode = .none;
+            table.selection_set.clearRetainingCapacity();
+            _ = table.selection_arena.reset(.retain_capacity);
+        }
+
+        /// Whether `row` is picked, as its checkbox shows it.
+        pub fn isSelected(table: *Self, row: *const DynamicRow) bool {
+            if (table.table_columns.len == 0) return false;
+            const value = row.get(table.table_columns[0].name) orelse return false;
+            return table.includes(value.toString());
+        }
+
+        /// How many rows are picked.
+        pub fn selectedCount(table: *Self) usize {
+            return switch (table.selection_mode) {
+                .none => 0,
+                .all => table.data.len,
+                .some => table.selection_set.count(),
+                .all_except => table.data.len -| table.selection_set.count(),
+            };
+        }
+
         /// Toggle select-all / deselect-all.
         fn selectAll(table: *Self) void {
             table.selection_mode = if (table.selection_mode == .all) .none else .all;
@@ -755,7 +788,7 @@ pub fn DynamicTable(
         /// `none ↔ some ↔ all ↔ all_except` states.
         fn selectRow(table: *Self, row: *DynamicRow) void {
             const value = row.get(table.table_columns[0].name) orelse return;
-            const id = value.toString();
+            const id = table.selection_arena.allocator().dupe(u8, value.toString()) catch return;
 
             switch (table.selection_mode) {
                 .none => {
@@ -1114,10 +1147,18 @@ pub fn DynamicTable(
             }
         }
 
+        /// "Pick row 5", by the row's first column, for a screen reader.
+        fn checkboxLabel(table: *Self, row: *const DynamicRow) []const u8 {
+            if (table.table_columns.len == 0) return "Pick row";
+            const value = row.get(table.table_columns[0].name) orelse return "Pick row";
+            return Vapor.fmtArena("Pick row {s}", .{value.toString()}, .frame);
+        }
+
         /// Render a checkbox used for row and header selection.
-        fn renderCheckbox(table: *Self, func: anytype, args: anytype, is_active: bool) void {
+        fn renderCheckbox(table: *Self, func: anytype, args: anytype, is_active: bool, label: []const u8) void {
             Button(func, args)
-                .ariaLabel("DynamicTable Row Checkbox")
+                .ariaLabel(label)
+                .attribute("aria-pressed", if (is_active) "true" else "false")
                 .width(.px(20))
                 .height(.px(20))
                 .cursor(.pointer)
@@ -1272,7 +1313,7 @@ pub fn DynamicTable(
                         .padding(.horizontal(table.style.cell_padding_horizontal))
                         .width(.px(table.style.checkbox_width))
                         .children({
-                        table.renderCheckbox(selectRow, .{ table, row }, is_selected);
+                        table.renderCheckbox(selectRow, .{ table, row }, is_selected, table.checkboxLabel(row));
                     });
                     // Columns
                     Box()
@@ -1463,7 +1504,7 @@ pub fn DynamicTable(
                                 .tabIndex(if (is_focused_row and table.focused_col == 0) 0 else -1)
                                 .width(.px(table.style.checkbox_width))
                                 .children({
-                                table.renderCheckbox(selectRow, .{ table, row }, is_selected);
+                                table.renderCheckbox(selectRow, .{ table, row }, is_selected, table.checkboxLabel(row));
                             });
                             // Columns
                             Box()
@@ -1938,7 +1979,7 @@ pub fn DynamicTable(
                                             .children({
                                             const all_active = table.selection_mode == .all;
                                             Button(selectAll, .{table})
-                                                .ariaLabel("DynamicTable Row Checkbox")
+                                                .ariaLabel("Pick every row")
                                                 .width(.px(20)).height(.px(20))
                                                 .cursor(.pointer).duration(table.style.hover_duration).hoverScale()
                                                 .a11y(Vapor.Accessibility.checkbox(all_active).setLabel("Select all"))

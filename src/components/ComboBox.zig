@@ -240,10 +240,11 @@ pub fn ComboBox(comptime T: type) type {
             return a11y;
         }
 
-        fn createBindedTrigger(_: *Self) *Vapor.Element {
-            const binded_trigger: *Vapor.Element = Vapor.arena(.frame).create(Vapor.Element) catch unreachable;
-            binded_trigger.* = .{};
-            return binded_trigger;
+        /// The trigger the list opens under. Kept in the component, not the frame:
+        /// a click comes frames later, and a trigger in the frame's memory was
+        /// overwritten by then, so the list did not open.
+        fn createBindedTrigger(self: *Self) *Vapor.Element {
+            return &self.binded_trigger;
         }
 
         fn toggleWithBindedTrigger(combobox: *Self, binded_trigger: *Vapor.Element) void {

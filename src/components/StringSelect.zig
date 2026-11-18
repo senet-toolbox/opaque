@@ -12,7 +12,7 @@ const Icon = Vapor.Icon;
 var background: Vapor.Types.Color = .palette(.background);
 var border: Vapor.Types.Border = .round(.palette(.border_color_light), .all(12));
 var group_title_color: Vapor.Types.Color = .hex("#8C8C8C");
-var text_color: Vapor.Types.Color = .black;
+var text_color: Vapor.Types.Color = .palette(.text_color);
 var font_family: []const u8 = "Montserrat";
 const selected_background: Vapor.Types.Color = .transparentize(.palette(.tint), 0.05);
 const selected_border: Vapor.Types.Border = .round(.palette(.tint), .all(12));
@@ -250,10 +250,11 @@ pub const StringSelect = struct {
         }
     }
 
-    fn createBindedTrigger(_: *Self) *Vapor.Element {
-        const binded_trigger: *Vapor.Element = Vapor.arena(.frame).create(Vapor.Element) catch unreachable;
-        binded_trigger.* = .{};
-        return binded_trigger;
+    /// The trigger the list opens under. Kept in the component, not the frame:
+    /// a click comes frames later, and a trigger in the frame's memory was
+    /// overwritten by then, so the list did not open.
+    fn createBindedTrigger(self: *Self) *Vapor.Element {
+        return &self.binded_trigger;
     }
 
     fn toggleWithBindedTrigger(select: *Self, binded_trigger: *Vapor.Element) void {
